@@ -168,12 +168,13 @@ func (l *Logger) log(level LogLevel, format string, args ...interface{}) {
 		if ok {
 			// 只显示文件名，不显示完整路径
 			shortFile := filepath.Base(file)
-			prefix += fmt.Sprintf(" [%s:%d]", shortFile, line)
+			prefix += fmt.Sprintf(" [%10s:%-3d]", shortFile, line)
 		}
 	}
 
 	// 构建完整日志消息
 	message := fmt.Sprintf(format, args...)
+
 	logLine := fmt.Sprintf("%s %s\n", prefix, message)
 
 	// 添加颜色（仅控制台输出）
