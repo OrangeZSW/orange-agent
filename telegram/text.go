@@ -38,7 +38,7 @@ func (h *HandlerText) OnText(c tele.Context) error {
 	user := h.GetUser(utils.Int64ToUint(telegramId), username)
 
 	h.log.Info("收到用户 %d 输入: %s", telegramId, c.Text())
-	res := h.answer.Answer(*user, c.Text(), "")
+	res := h.answer.Answer(*user, c.Text(), "你是一个telegram机器人,请回答问题")
 	h.log.Info("模型:%s 响应: %s", user.ModelName, res)
 	return c.Reply(res)
 }
