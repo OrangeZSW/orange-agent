@@ -10,29 +10,31 @@ import (
 )
 
 type HandlerCommand struct {
-	Bot            *tele.Bot
+	TelegramBot    *TelegramBot
 	agentConfigSql *mysql.AgentConfigSql
 	userSql        *mysql.UserSql
 }
 
-func NewHandler(bot *tele.Bot) *HandlerCommand {
-	return &HandlerCommand{
-		Bot:            bot,
+func NewHandlerCommand(bot *TelegramBot) *HandlerCommand {
+	res := &HandlerCommand{
+		TelegramBot:    bot,
 		agentConfigSql: mysql.NewAgentConfigSql(),
 		userSql:        mysql.NewUserSql(),
 	}
+	res.RegisterHandler()
+	return res
 }
 
 //register handler
 
 func (h *HandlerCommand) RegisterHandler() {
-	h.Bot.Handle("/start", h.Start)
-	h.Bot.Handle("/help", h.Help)
-	h.Bot.Handle("/addAgent", h.AddAgent)
-	h.Bot.Handle("/addModel", h.AddModel)
-	h.Bot.Handle("/agents", h.Agents)
-	h.Bot.Handle("/switch", h.Switch)
-	h.Bot.Handle("/model", h.Model)
+	h.TelegramBot.Bot.Handle("/start", h.Start)
+	h.TelegramBot.Bot.Handle("/help", h.Help)
+	h.TelegramBot.Bot.Handle("/addAgent", h.AddAgent)
+	h.TelegramBot.Bot.Handle("/addModel", h.AddModel)
+	h.TelegramBot.Bot.Handle("/agents", h.Agents)
+	h.TelegramBot.Bot.Handle("/switch", h.Switch)
+	h.TelegramBot.Bot.Handle("/model", h.Model)
 }
 
 func (tb *HandlerCommand) Start(c tele.Context) error {

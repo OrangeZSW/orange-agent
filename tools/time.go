@@ -20,7 +20,7 @@ func (t *CurrTime) Name() string {
 	return "curr_time"
 }
 func (t *CurrTime) Description() string {
-	return "Get the current time,no input"
+	return "tool: get current time,no input"
 }
 func (t *CurrTime) Call(ctx context.Context, input string) (string, error) {
 	return time.Now().Format("2006-01-02 15:04:05"), nil

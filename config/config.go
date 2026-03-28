@@ -21,6 +21,7 @@ type Config struct {
 type Telegram struct {
 	BotToken string `mapstructure:"bot_token"`
 	Proxy    string `mapstructure:"proxy"`
+	Promete  string `mapstructure:"promete"`
 }
 
 type DatabaseConfig struct {

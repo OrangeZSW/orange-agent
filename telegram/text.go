@@ -11,25 +11,27 @@ import (
 )
 
 type HandlerText struct {
-	Bot      *tele.Bot
+	telegram *TelegramBot
 	log      logger.Logger
 	answer   *lanchain.Answer
 	userSql  *mysql.UserSql
 	lanchain *lanchain.Lnachain
 }
 
-func NewHandlerText(bot *tele.Bot) *HandlerText {
-	return &HandlerText{
-		Bot:      bot,
+func NewHandlerText(bot *TelegramBot) *HandlerText {
+	res := &HandlerText{
+		telegram: bot,
 		log:      *logger.GetLogger(),
 		answer:   lanchain.NewAnswer(),
 		userSql:  mysql.NewUserSql(),
 		lanchain: lanchain.NewLnachain(),
 	}
+	res.RegisterHandler()
+	return res
 }
 
 func (h *HandlerText) RegisterHandler() {
-	h.Bot.Handle(tele.OnText, h.OnText)
+	h.telegram.Bot.Handle(tele.OnText, h.OnText)
 }
 
 func (h *HandlerText) OnText(c tele.Context) error {
@@ -38,7 +40,7 @@ func (h *HandlerText) OnText(c tele.Context) error {
 	user := h.GetUser(utils.Int64ToUint(telegramId), username)
 
 	h.log.Info("收到用户 %d 输入: %s", telegramId, c.Text())
-	res := h.answer.Answer(*user, c.Text(), "你是一个telegram机器人,请回答问题")
+	res := h.answer.Answer(*user, c.Text(), h.telegram.Config.Promete)
 	h.log.Info("模型:%s 响应: %s", user.ModelName, res)
 	return c.Reply(res)
 }

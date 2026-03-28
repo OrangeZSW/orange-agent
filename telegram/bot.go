@@ -22,15 +22,12 @@ type TelegramBot struct {
 func NewTelegramBot(config *config.Telegram) *TelegramBot {
 	b := NewTelegramBotWithProxy(config)
 	telegram := &TelegramBot{
-		Config:         config,
-		log:            logger.GetLogger(),
-		handlerCommand: NewHandler(b),
-		HandlerText:    NewHandlerText(b),
-		Bot:            b,
+		Config: config,
+		log:    logger.GetLogger(),
+		Bot:    b,
 	}
-	// 注册命令处理器
-	telegram.handlerCommand.RegisterHandler()
-	telegram.HandlerText.RegisterHandler()
+	telegram.handlerCommand = NewHandlerCommand(telegram)
+	telegram.HandlerText = NewHandlerText(telegram)
 	return telegram
 }
 
