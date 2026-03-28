@@ -30,14 +30,26 @@ func NewAnswer() *Answer {
 	}
 }
 
+// 调用模型
+func (l *Answer) Call(ctx context.Context, messages []llms.MessageContent, llm *openai.LLM, user domain.User) (*llms.ContentResponse, error) {
+	answer, err := llm.GenerateContent(ctx, messages, llms.WithTools(tools.GetEllTools()))
+	if err != nil {
+		l.log.Error("调用模型失败: %v", err)
+		return answer, err
+	}
+	l.saveCallRecord(user, answer)
+	l.log.Info("调用模型成功,保存调用消息")
+	return answer, nil
+}
+
 // 统一调用接口
 func (l *Answer) Answer(user domain.User, question string, promete string) string {
 	ctx := context.Background()
 	llm := l.lanchain.GetLLM(user.ModelName)
 	messages := l.buildMessages(user, question, promete)
-	l.log.Info("开始调用模型[%s][%s]", l.lanchain.agentConfig.Name, user.ModelName)
+	l.log.Info("准备调用模型[%s][%s]", l.lanchain.agentConfig.Name, user.ModelName)
 	l.log.Info("当前系统工具:%v", tools.GetTools())
-	answer, err := llm.GenerateContent(ctx, messages, llms.WithTools(tools.GetEllTools()))
+	answer, err := l.Call(ctx, messages, llm, user)
 	if err != nil {
 		l.log.Error("调用模型失败: %v", err)
 		return err.Error()
@@ -48,32 +60,41 @@ func (l *Answer) Answer(user domain.User, question string, promete string) strin
 	choices := answer.Choices[0]
 
 	if choices != nil && len(choices.ToolCalls) > 0 {
-		return l.HandlerTools(ctx, user, messages, answer, llm)
+		answer = l.HandlerTools(ctx, user, messages, answer, llm)
 	}
-
-	l.saveCallRecord(user, answer)
-	return choices.Content
+	return answer.Choices[0].Content
 }
 
 // 调用工具
-func (l *Answer) HandlerTools(ctx context.Context, user domain.User, message []llms.MessageContent, answer *llms.ContentResponse, llm *openai.LLM) string {
+func (l *Answer) HandlerTools(ctx context.Context, user domain.User, message []llms.MessageContent, answer *llms.ContentResponse, llm *openai.LLM) *llms.ContentResponse {
 	ToolsCalls := answer.Choices[0].ToolCalls
-
-	//添加assistant
-	AiMessage := llms.MessageContent{
-		Role:  llms.ChatMessageTypeAI,
-		Parts: []llms.ContentPart{},
-	}
 
 	//出口
 	if len(ToolsCalls) == 0 {
-		AiMessage = llms.MessageContent{
-			Role: llms.ChatMessageTypeAI,
-			Parts: []llms.ContentPart{
-				llms.TextPart(answer.Choices[0].Content),
-			},
-		}
-		return answer.Choices[0].Content
+		return answer
+	}
+
+	//添加assistant
+	message, err := buildToolMessages(ctx, ToolsCalls, l, answer, message)
+	if err != nil {
+		return answer
+	}
+
+	//调用模型
+	answer, err = l.Call(ctx, message, llm, user)
+	if err != nil {
+		l.log.Error("调用模型失败: %v", err)
+		answer.Choices[0].Content = "调用模型失败" + err.Error()
+		return answer
+	}
+
+	return l.HandlerTools(ctx, user, message, answer, llm)
+}
+
+func buildToolMessages(ctx context.Context, ToolsCalls []llms.ToolCall, l *Answer, answer *llms.ContentResponse, message []llms.MessageContent) ([]llms.MessageContent, error) {
+	AiMessage := llms.MessageContent{
+		Role:  llms.ChatMessageTypeAI,
+		Parts: []llms.ContentPart{},
 	}
 	ToolsMessage := llms.MessageContent{
 		Role:  llms.ChatMessageTypeTool,
@@ -101,7 +122,8 @@ func (l *Answer) HandlerTools(ctx context.Context, user domain.User, message []l
 				Content:    "解析参数失败" + err.Error(),
 				Name:       toolrecall.FunctionCall.Name,
 			})
-			continue
+			answer.Choices[0].Content = "执行工具失败" + err.Error()
+			return nil, err
 		}
 
 		res, err := l.executeTool(ctx, toolrecall.FunctionCall.Name, toolrecall.FunctionCall.Arguments)
@@ -112,7 +134,8 @@ func (l *Answer) HandlerTools(ctx context.Context, user domain.User, message []l
 				Content:    "执行工具失败" + err.Error(),
 				Name:       toolrecall.FunctionCall.Name,
 			})
-			return "执行工具失败" + err.Error()
+			answer.Choices[0].Content = "执行工具失败" + err.Error()
+			return nil, err
 		} else {
 			l.log.Info("工具调用成功：%-10s,结果：%.20s", toolrecall.FunctionCall.Name, res)
 			ToolsMessage.Parts = append(ToolsMessage.Parts, llms.ToolCallResponse{
@@ -125,19 +148,9 @@ func (l *Answer) HandlerTools(ctx context.Context, user domain.User, message []l
 
 	message = append(message, AiMessage)
 	message = append(message, ToolsMessage)
-
 	l.log.Info("工具调用结束")
 	l.log.Info("构建的消息: %.5v", message)
-
-	//调用模型
-	answer, err := llm.GenerateContent(ctx, message, llms.WithTools(tools.GetEllTools()))
-	if err != nil {
-		l.log.Error("调用模型失败: %v", err)
-		return "调用模型失败"
-	}
-	l.saveCallRecord(user, answer)
-
-	return l.HandlerTools(ctx, user, message, answer, llm)
+	return message, nil
 }
 
 // 执行工具
