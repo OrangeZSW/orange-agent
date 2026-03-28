@@ -20,6 +20,7 @@ type AnswerHandler struct {
 	langChain          *Lnachain
 	logger             *logger.Logger
 	agentCallRecordSql *mysql.AgentCallRecordSql
+	menmory            *domain.Memory
 }
 
 func NewAnswerHandler() *AnswerHandler {
@@ -45,10 +46,11 @@ func (h *AnswerHandler) CallLLM(ctx context.Context, messages []llms.MessageCont
 }
 
 // AnswerQuestion 处理用户问题并返回答案
-func (h *AnswerHandler) AnswerQuestion(user domain.User, question string, prompt string) string {
+func (h *AnswerHandler) AnswerQuestion(user domain.User, memory *domain.Memory, prompt string) string {
+	h.menmory = memory
 	ctx := context.Background()
 	llm := h.langChain.GetLLM(user.ModelName)
-	messages := h.buildMessages(user, question, prompt)
+	messages := h.buildMessages(user, memory.UserQuestion, prompt)
 
 	h.logger.Info("准备调用模型[%s][%s]", h.langChain.agentConfig.Name, user.ModelName)
 	h.logger.Info("可用工具列表: %v", tools.GetTools())
@@ -229,6 +231,7 @@ func (h *AnswerHandler) saveCallRecord(user domain.User, response *llms.ContentR
 		CompletionTokens: utils.GetIntFromMap(generationInfo, "CompletionTokens"),
 		PromptTokens:     utils.GetIntFromMap(generationInfo, "PromptTokens"),
 		TotalTokens:      utils.GetIntFromMap(generationInfo, "TotalTokens"),
+		MenmoryId:        h.menmory.ID,
 	}
 
 	if err := h.agentCallRecordSql.CreateAgentCallRecord(callRecord); err != nil {
