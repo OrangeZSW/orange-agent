@@ -6,4 +6,8 @@ var FileTools = []common.BaseTool{
 	&FileRead{},
 	&FileList{},
 	&FileWrite{},
+	&FileDeleteTools{},
+	&FileRenameTools{},
+	&FileCopyTools{},
+	&FileSearchTools{},
 }
