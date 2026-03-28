@@ -3,6 +3,7 @@ package tools
 import (
 	"orange-agent/common"
 	"orange-agent/tools/file"
+	"orange-agent/tools/git"
 	"sync"
 
 	"github.com/tmc/langchaingo/llms"
@@ -16,6 +17,7 @@ func InitTools() {
 	Once.Do(func() {
 		Tools = append(Tools, file.FileTools...)
 		Tools = append(Tools, TimeTools...)
+		Tools = append(Tools, git.GitTools...)
 	})
 }
 
