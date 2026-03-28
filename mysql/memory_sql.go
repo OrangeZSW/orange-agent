@@ -30,3 +30,8 @@ func (m *MemorySql) GetMemoryByUserId(userId uint) (*[]domain.Memory, error) {
 	}
 	return &memories, err
 }
+
+// update
+func (m *MemorySql) UpdateMemory(memory *domain.Memory) error {
+	return m.db.Save(memory).Error
+}

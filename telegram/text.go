@@ -48,6 +48,8 @@ func (h *HandlerText) OnText(c tele.Context) error {
 	h.log.Info("收到用户 %d 输入: %s", telegramId, c.Text())
 	res := h.answer.AnswerQuestion(*user, memory, h.telegram.Config.Promete)
 	h.log.Info("模型:%s 响应: %s", user.ModelName, res)
+	memory.AgentAnswer = res
+	h.memorySql.UpdateMemory(memory)
 	return c.Reply(res)
 }
 
