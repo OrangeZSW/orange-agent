@@ -201,7 +201,12 @@ func (h *AnswerHandler) buildMessages(user domain.User, question string, prompt 
 		h.logger.Error("获取用户记忆失败: %v", err)
 	} else {
 		h.logger.Debug("加载用户记忆：%d 条", len(*memories))
-		for _, memory := range *memories {
+
+		startIdx := 0
+		if len(*memories) > 5 {
+			startIdx = len(*memories) - 5
+		}
+		for _, memory := range (*memories)[startIdx:] {
 			messages = append(messages,
 				llms.TextParts(llms.ChatMessageTypeHuman, memory.UserQuestion),
 				llms.TextParts(llms.ChatMessageTypeAI, memory.AgentAnswer),
