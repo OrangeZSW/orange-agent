@@ -21,7 +21,7 @@ func (b *BuildTools) Description() string {
 func (b *BuildTools) Call(ctx context.Context, input string) (string, error) {
 	cmd := exec.Command("go", "build", "orange-agent")
 	output, err := cmd.CombinedOutput()
-	if err != nil {
+	if err == nil {
 		return string(output), nil
 	}
 	return err.Error(), nil
