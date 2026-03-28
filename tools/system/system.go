@@ -2,6 +2,18 @@ package system
 
 import "orange-agent/common"
 
+var (
+	BuildTool            = &BuildTools{}
+	ProjectRebootTool    = &ProjectRebootTools{}
+	LogViewTool          = &LogViewTools{}
+	EnvManageTool        = &EnvManageTools{}
+	TestRunTool          = &TestRunTools{}
+	DependencyCheckTool   = &DependencyCheckTools{}
+	PerformanceMonitorTool = &PerformanceMonitorTools{}
+	ApiTesterTool        = &ApiTesterTools{}
+	ConfigValidatorTool  = &ConfigValidatorTools{}
+)
+
 var SystemTools = []common.BaseTool{
 	BuildTool,
 	ProjectRebootTool,

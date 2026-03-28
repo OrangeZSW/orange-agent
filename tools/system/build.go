@@ -19,12 +19,16 @@ func (b *BuildTools) Description() string {
 }
 
 func (b *BuildTools) Call(ctx context.Context, input string) (string, error) {
-	cmd := exec.Command("go", "build", "orange-agent")
+	cmd := exec.Command("bash", "-c", "chmod +x ./build.sh && ./build.sh")
 	output, err := cmd.CombinedOutput()
-	if err == nil {
-		return string(output), nil
+	
+	result := "Build output:\n" + string(output)
+	if err != nil {
+		result += "\n\nBuild failed with error: " + err.Error()
+		return result, err
 	}
-	return err.Error(), nil
+	result += "\n\nBuild completed successfully!"
+	return result, nil
 }
 
 func (b *BuildTools) Parameters() interface{} {
