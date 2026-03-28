@@ -3,6 +3,7 @@ package lanchain
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"orange-agent/domain"
 	"orange-agent/mysql"
 	"orange-agent/tools"
@@ -13,194 +14,253 @@ import (
 	"github.com/tmc/langchaingo/llms/openai"
 )
 
-type Answer struct {
+// AnswerHandler 处理用户问题的答案生成
+type AnswerHandler struct {
 	memorySql          *mysql.MemorySql
-	lanchain           *Lnachain
-	log                *logger.Logger
+	langChain          *Lnachain
+	logger             *logger.Logger
 	agentCallRecordSql *mysql.AgentCallRecordSql
 }
 
-// New
-func NewAnswer() *Answer {
-	return &Answer{
+func NewAnswerHandler() *AnswerHandler {
+	return &AnswerHandler{
 		memorySql:          mysql.NewMemorySql(),
-		lanchain:           NewLnachain(),
-		log:                logger.GetLogger(),
+		langChain:          NewLnachain(),
+		logger:             logger.GetLogger(),
 		agentCallRecordSql: mysql.NewAgentCallRecordSql(),
 	}
 }
 
-// 调用模型
-func (l *Answer) Call(ctx context.Context, messages []llms.MessageContent, llm *openai.LLM, user domain.User) (*llms.ContentResponse, error) {
-	answer, err := llm.GenerateContent(ctx, messages, llms.WithTools(tools.GetEllTools()))
+// CallLLM 调用语言模型生成答案
+func (h *AnswerHandler) CallLLM(ctx context.Context, messages []llms.MessageContent, llm *openai.LLM, user domain.User) (*llms.ContentResponse, error) {
+	response, err := llm.GenerateContent(ctx, messages, llms.WithTools(tools.GetEllTools()))
 	if err != nil {
-		l.log.Error("调用模型失败: %v", err)
-		return answer, err
+		h.logger.Error("调用语言模型失败: %v", err)
+		return nil, fmt.Errorf("调用语言模型失败: %w", err)
 	}
-	l.saveCallRecord(user, answer)
-	l.log.Info("调用模型成功,保存调用消息")
-	return answer, nil
+
+	h.saveCallRecord(user, response)
+	h.logger.Info("语言模型调用成功，已保存调用记录")
+	return response, nil
 }
 
-// 统一调用接口
-func (l *Answer) Answer(user domain.User, question string, promete string) string {
+// AnswerQuestion 处理用户问题并返回答案
+func (h *AnswerHandler) AnswerQuestion(user domain.User, question string, prompt string) string {
 	ctx := context.Background()
-	llm := l.lanchain.GetLLM(user.ModelName)
-	messages := l.buildMessages(user, question, promete)
-	l.log.Info("准备调用模型[%s][%s]", l.lanchain.agentConfig.Name, user.ModelName)
-	l.log.Info("当前系统工具:%v", tools.GetTools())
-	answer, err := l.Call(ctx, messages, llm, user)
-	if err != nil {
-		l.log.Error("调用模型失败: %v", err)
-		return err.Error()
-	}
-	if len(answer.Choices) == 0 {
-		return ""
-	}
-	choices := answer.Choices[0]
+	llm := h.langChain.GetLLM(user.ModelName)
+	messages := h.buildMessages(user, question, prompt)
 
-	if choices != nil && len(choices.ToolCalls) > 0 {
-		answer = l.HandlerTools(ctx, user, messages, answer, llm)
+	h.logger.Info("准备调用模型[%s][%s]", h.langChain.agentConfig.Name, user.ModelName)
+	h.logger.Info("可用工具列表: %v", tools.GetTools())
+
+	response, err := h.CallLLM(ctx, messages, llm, user)
+	if err != nil {
+		h.logger.Error("调用模型失败: %v", err)
+		return fmt.Sprintf("系统错误: %v", err)
 	}
-	return answer.Choices[0].Content
+
+	if len(response.Choices) == 0 {
+		h.logger.Warn("模型返回空选择列表")
+		return "抱歉，我没有收到有效的回复"
+	}
+
+	choice := response.Choices[0]
+	if choice == nil {
+		h.logger.Warn("模型返回空选择")
+		return "抱歉，我没有收到有效的回复"
+	}
+
+	// 处理工具调用
+	if len(choice.ToolCalls) > 0 {
+		response = h.handleToolCalls(ctx, user, messages, response, llm)
+	}
+
+	if len(response.Choices) == 0 || response.Choices[0] == nil {
+		return "抱歉，处理过程中出现错误"
+	}
+
+	return response.Choices[0].Content
 }
 
-// 调用工具
-func (l *Answer) HandlerTools(ctx context.Context, user domain.User, message []llms.MessageContent, answer *llms.ContentResponse, llm *openai.LLM) *llms.ContentResponse {
-	ToolsCalls := answer.Choices[0].ToolCalls
+// handleToolCalls 递归处理工具调用
+func (h *AnswerHandler) handleToolCalls(ctx context.Context, user domain.User, messages []llms.MessageContent,
+	response *llms.ContentResponse, llm *openai.LLM) *llms.ContentResponse {
 
-	//出口
-	if len(ToolsCalls) == 0 {
-		return answer
+	choice := response.Choices[0]
+	if choice == nil || len(choice.ToolCalls) == 0 {
+		return response
 	}
 
-	//添加assistant
-	message, err := buildToolMessages(ctx, ToolsCalls, l, answer, message)
+	// 构建包含工具调用的消息
+	updatedMessages, err := h.buildToolMessages(ctx, choice.ToolCalls, response, messages)
 	if err != nil {
-		return answer
+		h.logger.Error("构建工具消息失败: %v", err)
+		return h.createErrorResponse(response, fmt.Sprintf("构建工具消息失败: %v", err))
 	}
 
-	//调用模型
-	answer, err = l.Call(ctx, message, llm, user)
+	// 再次调用模型
+	newResponse, err := h.CallLLM(ctx, updatedMessages, llm, user)
 	if err != nil {
-		l.log.Error("调用模型失败: %v", err)
-		answer.Choices[0].Content = "调用模型失败" + err.Error()
-		return answer
+		h.logger.Error("工具调用后再次调用模型失败: %v", err)
+		return h.createErrorResponse(response, fmt.Sprintf("工具调用失败: %v", err))
 	}
 
-	return l.HandlerTools(ctx, user, message, answer, llm)
+	// 递归处理可能的进一步工具调用
+	return h.handleToolCalls(ctx, user, updatedMessages, newResponse, llm)
 }
 
-func buildToolMessages(ctx context.Context, ToolsCalls []llms.ToolCall, l *Answer, answer *llms.ContentResponse, message []llms.MessageContent) ([]llms.MessageContent, error) {
-	AiMessage := llms.MessageContent{
+// buildToolMessages 构建包含工具调用和响应的消息
+func (h *AnswerHandler) buildToolMessages(ctx context.Context, toolCalls []llms.ToolCall,
+	response *llms.ContentResponse, messages []llms.MessageContent) ([]llms.MessageContent, error) {
+
+	aiMessage := llms.MessageContent{
 		Role:  llms.ChatMessageTypeAI,
 		Parts: []llms.ContentPart{},
 	}
-	ToolsMessage := llms.MessageContent{
+
+	toolMessage := llms.MessageContent{
 		Role:  llms.ChatMessageTypeTool,
 		Parts: []llms.ContentPart{},
 	}
-	// 执行工具
-	for _, toolrecall := range ToolsCalls {
 
-		AiMessage.Parts = append(AiMessage.Parts, llms.ToolCall{
-			ID:   toolrecall.ID,
-			Type: toolrecall.Type,
+	// 执行每个工具调用
+	for _, toolCall := range toolCalls {
+		// 添加AI的工具调用消息
+		aiMessage.Parts = append(aiMessage.Parts, llms.ToolCall{
+			ID:   toolCall.ID,
+			Type: toolCall.Type,
 			FunctionCall: &llms.FunctionCall{
-				Name:      toolrecall.FunctionCall.Name,
-				Arguments: toolrecall.FunctionCall.Arguments,
+				Name:      toolCall.FunctionCall.Name,
+				Arguments: toolCall.FunctionCall.Arguments,
 			},
 		})
 
-		l.log.Info("执行工具调用：%-10s,参数：%.20s", toolrecall.FunctionCall.Name, toolrecall.FunctionCall.Arguments)
-		// 解析参数（假设参数是JSON字符串）
-		var args map[string]interface{}
-		if err := json.Unmarshal([]byte(toolrecall.FunctionCall.Arguments), &args); err != nil {
-			l.log.Error("解析参数失败:%v", err)
-			ToolsMessage.Parts = append(ToolsMessage.Parts, llms.ToolCallResponse{
-				ToolCallID: toolrecall.ID,
-				Content:    "解析参数失败" + err.Error(),
-				Name:       toolrecall.FunctionCall.Name,
-			})
-			answer.Choices[0].Content = "执行工具失败" + err.Error()
-			return nil, err
-		}
+		h.logger.Info("执行工具调用：%s，参数：%.50s",
+			toolCall.FunctionCall.Name,
+			toolCall.FunctionCall.Arguments)
 
-		res, err := l.executeTool(ctx, toolrecall.FunctionCall.Name, toolrecall.FunctionCall.Arguments)
+		// 执行工具
+		result, err := h.executeTool(ctx, toolCall.FunctionCall.Name, toolCall.FunctionCall.Arguments)
 		if err != nil {
-			l.log.Error("执行工具失败: %v", err)
-			ToolsMessage.Parts = append(ToolsMessage.Parts, llms.ToolCallResponse{
-				ToolCallID: toolrecall.ID,
-				Content:    "执行工具失败" + err.Error(),
-				Name:       toolrecall.FunctionCall.Name,
+			h.logger.Error("执行工具 %s 失败: %v", toolCall.FunctionCall.Name, err)
+			toolMessage.Parts = append(toolMessage.Parts, llms.ToolCallResponse{
+				ToolCallID: toolCall.ID,
+				Content:    fmt.Sprintf("工具执行失败: %v", err),
+				Name:       toolCall.FunctionCall.Name,
 			})
-			answer.Choices[0].Content = "执行工具失败" + err.Error()
-			return nil, err
 		} else {
-			l.log.Info("工具调用成功：%-10s,结果：%.20s", toolrecall.FunctionCall.Name, res)
-			ToolsMessage.Parts = append(ToolsMessage.Parts, llms.ToolCallResponse{
-				ToolCallID: toolrecall.ID,
-				Content:    res,
-				Name:       toolrecall.FunctionCall.Name,
+			h.logger.Info("工具调用 %s 成功，结果：%.50s", toolCall.FunctionCall.Name, result)
+			toolMessage.Parts = append(toolMessage.Parts, llms.ToolCallResponse{
+				ToolCallID: toolCall.ID,
+				Content:    result,
+				Name:       toolCall.FunctionCall.Name,
 			})
 		}
 	}
 
-	message = append(message, AiMessage)
-	message = append(message, ToolsMessage)
-	l.log.Info("工具调用结束")
-	l.log.Info("构建的消息: %.5v", message)
-	return message, nil
+	h.logger.Info("工具调用处理完成")
+
+	// 构建新的消息列表
+	updatedMessages := make([]llms.MessageContent, 0, len(messages)+2)
+	updatedMessages = append(updatedMessages, messages...)
+	updatedMessages = append(updatedMessages, aiMessage, toolMessage)
+
+	return updatedMessages, nil
 }
 
-// 执行工具
-func (a *Answer) executeTool(ctx context.Context, name string, input string) (string, error) {
-	data := tools.GetTools()
-	for _, tool := range tools.GetEllTools() {
-		if tool.Function.Name == name {
-			res, err := data[name].Call(ctx, input)
-			if err != nil {
-				return "", err
-			} else {
-				return res, nil
-			}
+// executeTool 执行具体的工具
+func (h *AnswerHandler) executeTool(ctx context.Context, toolName string, arguments string) (string, error) {
+	availableTools := tools.GetTools()
+
+	// 检查工具是否存在
+	if _, exists := availableTools[toolName]; !exists {
+		h.logger.Error("未找到工具：%s", toolName)
+		return "", fmt.Errorf("工具 '%s' 不存在", toolName)
+	}
+
+	// 执行工具
+	result, err := availableTools[toolName].Call(ctx, arguments)
+	if err != nil {
+		return "", fmt.Errorf("工具调用失败: %w", err)
+	}
+
+	return result, nil
+}
+
+// buildMessages 构建完整的对话消息
+func (h *AnswerHandler) buildMessages(user domain.User, question string, prompt string) []llms.MessageContent {
+	messages := []llms.MessageContent{
+		llms.TextParts(llms.ChatMessageTypeSystem, prompt),
+	}
+
+	// 添加用户记忆
+	memories, err := h.memorySql.GetMemoryByUserId(user.ID)
+	if err != nil {
+		h.logger.Error("获取用户记忆失败: %v", err)
+	} else {
+		h.logger.Debug("加载用户记忆：%d 条", len(*memories))
+		for _, memory := range *memories {
+			messages = append(messages,
+				llms.TextParts(llms.ChatMessageTypeHuman, memory.UserQuestion),
+				llms.TextParts(llms.ChatMessageTypeAI, memory.AgentAnswer),
+			)
 		}
 	}
-	a.log.Error("未找到工具：%s", name)
-	return name + "工具未找到", nil
-}
 
-// 构建消息
-func (l *Answer) buildMessages(user domain.User, question string, promete string) []llms.MessageContent {
-	var messages []llms.MessageContent
-
-	messages = append(messages, llms.TextParts(llms.ChatMessageTypeSystem, promete))
-
-	memory, err := l.memorySql.GetMemoryByUserId(user.ID)
-	l.log.Debug("用户记忆：%v", *memory)
-	if err != nil {
-		l.log.Error("获取用户记忆失败: %v", err)
-	}
-	for _, m := range *memory {
-		messages = append(messages, llms.TextParts(llms.ChatMessageTypeHuman, m.UserQuestion))
-		messages = append(messages, llms.TextParts(llms.ChatMessageTypeAI, m.AgentAnswer))
-	}
+	// 添加当前问题
 	messages = append(messages, llms.TextParts(llms.ChatMessageTypeHuman, question))
 
-	l.log.Debug("构建的消息：%v", messages)
+	h.logger.Debug("构建的消息数量：%d", len(messages))
 	return messages
 }
 
-// 构建 agent call record
-func (l *Answer) saveCallRecord(user domain.User, answer *llms.ContentResponse) {
-	originMap := answer.Choices[0].GenerationInfo
-	agentCallRecord := &domain.CallRecord{
-		AgentName:        user.ModelName,
-		AgentId:          l.lanchain.agentConfig.ID,
-		UserID:           user.ID,
-		CompletionTokens: utils.GetIntFromMap(originMap, "CompletionTokens"),
-		PromptTokens:     utils.GetIntFromMap(originMap, "PromptTokens"),
-		TotalTokens:      utils.GetIntFromMap(originMap, "TotalTokens"),
+// saveCallRecord 保存调用记录
+func (h *AnswerHandler) saveCallRecord(user domain.User, response *llms.ContentResponse) {
+	if len(response.Choices) == 0 || response.Choices[0] == nil {
+		h.logger.Warn("无法保存空响应的调用记录")
+		return
 	}
-	l.agentCallRecordSql.CreateAgentCallRecord(agentCallRecord)
+
+	generationInfo := response.Choices[0].GenerationInfo
+	callRecord := &domain.CallRecord{
+		AgentName:        user.ModelName,
+		AgentId:          h.langChain.agentConfig.ID,
+		UserID:           user.ID,
+		CompletionTokens: utils.GetIntFromMap(generationInfo, "CompletionTokens"),
+		PromptTokens:     utils.GetIntFromMap(generationInfo, "PromptTokens"),
+		TotalTokens:      utils.GetIntFromMap(generationInfo, "TotalTokens"),
+	}
+
+	if err := h.agentCallRecordSql.CreateAgentCallRecord(callRecord); err != nil {
+		h.logger.Error("保存调用记录失败: %v", err)
+	}
+}
+
+// createErrorResponse 创建错误响应
+func (h *AnswerHandler) createErrorResponse(originalResponse *llms.ContentResponse, errorMessage string) *llms.ContentResponse {
+	if len(originalResponse.Choices) == 0 {
+		originalResponse.Choices = []*llms.ContentChoice{
+			{
+				Content: errorMessage,
+			},
+		}
+	} else if originalResponse.Choices[0] != nil {
+		originalResponse.Choices[0].Content = errorMessage
+	}
+
+	return originalResponse
+}
+
+// ToolArguments 工具调用的参数结构
+type ToolArguments struct {
+	Input string `json:"input"`
+}
+
+// parseToolArguments 解析工具参数
+func parseToolArguments(jsonArgs string) (ToolArguments, error) {
+	var args ToolArguments
+	if err := json.Unmarshal([]byte(jsonArgs), &args); err != nil {
+		return args, fmt.Errorf("解析工具参数失败: %w", err)
+	}
+	return args, nil
 }

@@ -13,7 +13,7 @@ import (
 type HandlerText struct {
 	telegram *TelegramBot
 	log      logger.Logger
-	answer   *lanchain.Answer
+	answer   *lanchain.AnswerHandler
 	userSql  *mysql.UserSql
 	lanchain *lanchain.Lnachain
 }
@@ -22,7 +22,7 @@ func NewHandlerText(bot *TelegramBot) *HandlerText {
 	res := &HandlerText{
 		telegram: bot,
 		log:      *logger.GetLogger(),
-		answer:   lanchain.NewAnswer(),
+		answer:   lanchain.NewAnswerHandler(),
 		userSql:  mysql.NewUserSql(),
 		lanchain: lanchain.NewLnachain(),
 	}
@@ -40,7 +40,7 @@ func (h *HandlerText) OnText(c tele.Context) error {
 	user := h.GetUser(utils.Int64ToUint(telegramId), username)
 
 	h.log.Info("收到用户 %d 输入: %s", telegramId, c.Text())
-	res := h.answer.Answer(*user, c.Text(), h.telegram.Config.Promete)
+	res := h.answer.AnswerQuestion(*user, c.Text(), h.telegram.Config.Promete)
 	h.log.Info("模型:%s 响应: %s", user.ModelName, res)
 	return c.Reply(res)
 }
