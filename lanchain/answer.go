@@ -53,7 +53,6 @@ func (h *AnswerHandler) AnswerQuestion(user domain.User, memory *domain.Memory, 
 	messages := h.buildMessages(user, memory.UserQuestion, prompt)
 
 	h.logger.Info("准备调用模型[%s][%s]", h.langChain.agentConfig.Name, user.ModelName)
-	h.logger.Info("可用工具列表: %v", tools.GetTools())
 
 	response, err := h.CallLLM(ctx, messages, llm, user)
 	if err != nil {
@@ -94,7 +93,7 @@ func (h *AnswerHandler) handleToolCalls(ctx context.Context, user domain.User, m
 	}
 
 	// 构建包含工具调用的消息
-	updatedMessages, err := h.buildToolMessages(ctx, choice.ToolCalls, response, messages)
+	updatedMessages, err := h.buildToolMessages(ctx, choice.ToolCalls, messages)
 	if err != nil {
 		h.logger.Error("构建工具消息失败: %v", err)
 		return h.createErrorResponse(response, fmt.Sprintf("构建工具消息失败: %v", err))
@@ -111,23 +110,22 @@ func (h *AnswerHandler) handleToolCalls(ctx context.Context, user domain.User, m
 	return h.handleToolCalls(ctx, user, updatedMessages, newResponse, llm)
 }
 
-// buildToolMessages 构建包含工具调用和响应的消息
+// / buildToolMessages 构建包含工具调用和响应的消息
 func (h *AnswerHandler) buildToolMessages(ctx context.Context, toolCalls []llms.ToolCall,
-	response *llms.ContentResponse, messages []llms.MessageContent) ([]llms.MessageContent, error) {
+	messages []llms.MessageContent) ([]llms.MessageContent, error) {
 
+	// AI 消息包含所有工具调用
 	aiMessage := llms.MessageContent{
 		Role:  llms.ChatMessageTypeAI,
 		Parts: []llms.ContentPart{},
 	}
 
-	toolMessage := llms.MessageContent{
-		Role:  llms.ChatMessageTypeTool,
-		Parts: []llms.ContentPart{},
-	}
+	// 用于存储所有工具响应消息
+	var toolMessages []llms.MessageContent
 
 	// 执行每个工具调用
 	for _, toolCall := range toolCalls {
-		// 添加AI的工具调用消息
+		// 添加AI的工具调用信息
 		aiMessage.Parts = append(aiMessage.Parts, llms.ToolCall{
 			ID:   toolCall.ID,
 			Type: toolCall.Type,
@@ -143,6 +141,13 @@ func (h *AnswerHandler) buildToolMessages(ctx context.Context, toolCalls []llms.
 
 		// 执行工具
 		result, err := h.executeTool(ctx, toolCall.FunctionCall.Name, toolCall.FunctionCall.Arguments)
+
+		// 为每个工具调用创建独立的 tool 消息
+		toolMessage := llms.MessageContent{
+			Role:  llms.ChatMessageTypeTool,
+			Parts: []llms.ContentPart{},
+		}
+
 		if err != nil {
 			h.logger.Error("执行工具 %s 失败: %v", toolCall.FunctionCall.Name, err)
 			toolMessage.Parts = append(toolMessage.Parts, llms.ToolCallResponse{
@@ -158,14 +163,18 @@ func (h *AnswerHandler) buildToolMessages(ctx context.Context, toolCalls []llms.
 				Name:       toolCall.FunctionCall.Name,
 			})
 		}
+
+		// 添加到工具消息列表
+		toolMessages = append(toolMessages, toolMessage)
 	}
 
-	h.logger.Info("工具调用处理完成")
+	h.logger.Info("工具调用处理完成，共处理 %d 个工具调用", len(toolCalls))
 
 	// 构建新的消息列表
-	updatedMessages := make([]llms.MessageContent, 0, len(messages)+2)
+	updatedMessages := make([]llms.MessageContent, 0, len(messages)+1+len(toolMessages))
 	updatedMessages = append(updatedMessages, messages...)
-	updatedMessages = append(updatedMessages, aiMessage, toolMessage)
+	updatedMessages = append(updatedMessages, aiMessage)
+	updatedMessages = append(updatedMessages, toolMessages...)
 
 	return updatedMessages, nil
 }
