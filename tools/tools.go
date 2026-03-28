@@ -2,6 +2,7 @@ package tools
 
 import (
 	"orange-agent/common"
+	"orange-agent/tools/agent"
 	"orange-agent/tools/file"
 	"orange-agent/tools/git"
 	"orange-agent/tools/system"
@@ -20,6 +21,7 @@ func InitTools() {
 		Tools = append(Tools, TimeTools...)
 		Tools = append(Tools, git.GitTools...)
 		Tools = append(Tools, system.SystemTools...)
+		Tools = append(Tools, agent.AgentTools...)
 	})
 }
 

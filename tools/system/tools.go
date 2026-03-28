@@ -1,6 +1,8 @@
 package system
 
-import "orange-agent/common"
+import (
+	"orange-agent/common"
+)
 
 var SystemTools = []common.BaseTool{
 	BuildTool,
