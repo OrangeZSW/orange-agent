@@ -1,14 +1,56 @@
 package system
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"orange-agent/common"
 	"os/exec"
 )
 
-var TestRunTool = common.BaseTool{
-	Name:        "test_run",
-	Description: "运行测试用例",
-	Parameters: map[string]interface{}{
+type TestRunTools struct {
+	common.BaseTool
+}
+
+func (t *TestRunTools) Name() string {
+	return "test_run"
+}
+
+func (t *TestRunTools) Description() string {
+	return "运行测试用例"
+}
+
+func (t *TestRunTools) Call(ctx context.Context, input string) (string, error) {
+	var params struct {
+		Package string `json:"package"`
+		Verbose bool   `json:"verbose"`
+	}
+
+	if err := json.Unmarshal([]byte(input), &params); err != nil {
+		return "", fmt.Errorf("failed to parse arguments: %v", err)
+	}
+
+	args := []string{"test"}
+	if params.Verbose {
+		args = append(args, "-v")
+	}
+	if params.Package != "" {
+		args = append(args, params.Package)
+	} else {
+		args = append(args, "./...")
+	}
+
+	cmd := exec.Command("go", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(output), err
+	}
+
+	return string(output), nil
+}
+
+func (t *TestRunTools) Parameters() interface{} {
+	return map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
 			"package": map[string]interface{}{
@@ -20,26 +62,6 @@ var TestRunTool = common.BaseTool{
 				"description": "是否显示详细输出",
 			},
 		},
-		"required": [],
-	},
-}
-
-func RunTests(packagePath string, verbose bool) (string, error) {
-	args := []string{"test"}
-	if verbose {
-		args = append(args, "-v")
+		"required": []string{},
 	}
-	if packagePath != "" {
-		args = append(args, packagePath)
-	} else {
-		args = append(args, "./...")
-	}
-
-	cmd := exec.Command("go", args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", err
-	}
-
-	return string(output), nil
 }

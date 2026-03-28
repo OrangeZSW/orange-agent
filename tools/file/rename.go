@@ -1,14 +1,48 @@
 package file
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"orange-agent/common"
 	"os"
 )
 
-var FileRenameTool = common.BaseTool{
-	Name:        "file_rename",
-	Description: "重命名文件或目录",
-	Parameters: map[string]interface{}{
+type FileRenameTools struct {
+	common.BaseTool
+}
+
+func (f *FileRenameTools) Name() string {
+	return "file_rename"
+}
+
+func (f *FileRenameTools) Description() string {
+	return "重命名文件或目录"
+}
+
+func (f *FileRenameTools) Call(ctx context.Context, input string) (string, error) {
+	var params struct {
+		OldPath string `json:"old_path"`
+		NewPath string `json:"new_path"`
+	}
+
+	if err := json.Unmarshal([]byte(input), &params); err != nil {
+		return "", fmt.Errorf("failed to parse arguments: %v", err)
+	}
+
+	if params.OldPath == "" || params.NewPath == "" {
+		return "", fmt.Errorf("old_path and new_path are required")
+	}
+
+	err := os.Rename(params.OldPath, params.NewPath)
+	if err != nil {
+		return "", err
+	}
+	return "文件已成功重命名：" + params.OldPath + " -> " + params.NewPath, nil
+}
+
+func (f *FileRenameTools) Parameters() interface{} {
+	return map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
 			"old_path": map[string]interface{}{
@@ -20,14 +54,6 @@ var FileRenameTool = common.BaseTool{
 				"description": "新文件路径",
 			},
 		},
-		"required": []interface{}{"old_path", "new_path"},
-	},
-}
-
-func RenameFile(oldPath, newPath string) (string, error) {
-	err := os.Rename(oldPath, newPath)
-	if err != nil {
-		return "", err
+		"required": []string{"old_path", "new_path"},
 	}
-	return "文件已成功重命名：" + oldPath + " -> " + newPath, nil
 }
