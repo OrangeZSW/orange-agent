@@ -8,19 +8,24 @@ import (
 	"os/exec"
 )
 
-type GitDiff struct {
-	common.BaseTool
+var GitDiffTool = common.BaseTool{
+	Name:        "git_diff",
+	Description: "执行 git diff 命令，显示仓库中的更改，支持指定文件或暂存区/未暂存区的差异",
+	Parameters: map[string]interface{}{
+		"file": map[string]interface{}{
+			"type":        "string",
+			"description": "可选：要显示差异的具体文件，不提供则显示所有未暂存的更改",
+		},
+		"staged": map[string]interface{}{
+			"type":        "boolean",
+			"description": "可选：如果为 true，显示已暂存的更改（相当于 --cached），默认为 false",
+		},
+	},
+	Call: handlerGitDiff,
 }
 
-func (g *GitDiff) Name() string {
-	return "git_diff"
-}
-
-func (g *GitDiff) Description() string {
-	return "Execute git diff command to show changes in the repository. Supports file-specific or staged/unstaged diffs."
-}
-
-func (g *GitDiff) Call(ctx context.Context, input string) (string, error) {
+func handlerGitDiff(ctx context.Context, input string) (string, error) {
+	// 解析JSON参数
 	var params struct {
 		File   string `json:"file"`
 		Staged bool   `json:"staged"`
@@ -45,21 +50,4 @@ func (g *GitDiff) Call(ctx context.Context, input string) (string, error) {
 	}
 
 	return string(output), nil
-}
-
-func (g *GitDiff) Parameters() interface{} {
-	return map[string]interface{}{
-		"type": "object",
-		"properties": map[string]interface{}{
-			"file": map[string]interface{}{
-				"type":        "string",
-				"description": "Optional: specific file to diff. If not provided, shows all unstaged changes.",
-			},
-			"staged": map[string]interface{}{
-				"type":        "boolean",
-				"description": "Optional: if true, shows staged changes (equivalent to --cached). Default is false.",
-			},
-		},
-		"required": []string{},
-	}
 }

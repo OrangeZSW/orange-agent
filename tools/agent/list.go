@@ -1,24 +1,24 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"orange-agent/common"
-	"orange-agent/config/config"
 	"orange-agent/domain"
+	"orange-agent/mysql"
 )
 
 var AgentListTool = common.BaseTool{
 	Name:        "agent_list",
 	Description: "列出所有已配置的Agent",
-	Parameters:  map[string]string{},
-	Required:    []string{},
-	Handler:     handleAgentList,
+	Parameters:  map[string]interface{}{},
+	Call:        handleAgentList,
 }
 
-func handleAgentList(params map[string]interface{}) (string, error) {
+func handleAgentList(ctx context.Context, input string) (string, error) {
 	var agents []domain.AgentConfig
-	if err := config.DB.Find(&agents).Error; err != nil {
+	if err := mysql.GetDB().Find(&agents).Error; err != nil {
 		return "", fmt.Errorf("查询Agent列表失败: %v", err)
 	}
 

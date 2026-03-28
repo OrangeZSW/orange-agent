@@ -13,5 +13,4 @@ var SystemTools = []common.BaseTool{
 	DependencyCheckTool,
 	PerformanceMonitorTool,
 	ApiTesterTool,
-	ConfigValidatorTool,
 }

@@ -5,11 +5,10 @@ import (
 )
 
 var FileTools = []common.BaseTool{
-	&FileRead{},
-	&FileList{},
-	&FileWrite{},
-	&FileDeleteTools{},
-	&FileRenameTools{},
-	&FileCopyTools{},
-	&FileSearchTools{},
+	FileReadTool,
+	FileWriteTool,
+	FileDeleteTool,
+	FileListTool,
+	FileRenameTool,
+	FileSearchTool,
 }

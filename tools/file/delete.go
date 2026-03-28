@@ -8,19 +8,27 @@ import (
 	"os"
 )
 
-type FileDeleteTools struct {
-	common.BaseTool
+var FileDeleteTool = common.BaseTool{
+	Name:        "file_delete",
+	Description: "删除指定的文件",
+	Call:        handlerFileDelete,
+	Parameters: map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"file_path": map[string]interface{}{
+				"type":        "string",
+				"description": "要删除的文件路径",
+			},
+			"force": map[string]interface{}{
+				"type":        "boolean",
+				"description": "是否强制删除，默认为false",
+			},
+		},
+		"required": []string{"file_path"},
+	},
 }
 
-func (f *FileDeleteTools) Name() string {
-	return "file_delete"
-}
-
-func (f *FileDeleteTools) Description() string {
-	return "删除指定的文件"
-}
-
-func (f *FileDeleteTools) Call(ctx context.Context, input string) (string, error) {
+func handlerFileDelete(ctx context.Context, input string) (string, error) {
 	var params struct {
 		FilePath string `json:"file_path"`
 	}
@@ -38,17 +46,4 @@ func (f *FileDeleteTools) Call(ctx context.Context, input string) (string, error
 		return "", err
 	}
 	return "文件已成功删除：" + params.FilePath, nil
-}
-
-func (f *FileDeleteTools) Parameters() interface{} {
-	return map[string]interface{}{
-		"type": "object",
-		"properties": map[string]interface{}{
-			"file_path": map[string]interface{}{
-				"type":        "string",
-				"description": "要删除的文件路径",
-			},
-		},
-		"required": []string{"file_path"},
-	}
 }

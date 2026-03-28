@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"encoding/json"
 	"strconv"
 	"strings"
 )
@@ -31,4 +32,19 @@ func BoolToStr(b bool) string {
 // []str -> str
 func StrArrToStr(arr []string) string {
 	return "[" + strings.Join(arr, ",") + "]"
+}
+
+// str -> struct
+func StrToStruct(s string, v interface{}) error {
+	return json.Unmarshal([]byte(s), v)
+}
+
+// str -> map
+func StrToMap(s string) (map[string]interface{}, error) {
+	var m map[string]interface{}
+	err := json.Unmarshal([]byte(s), &m)
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
 }

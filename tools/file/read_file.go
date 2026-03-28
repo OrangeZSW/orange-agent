@@ -8,20 +8,20 @@ import (
 	"orange-agent/utils/file"
 )
 
-type FileRead struct {
-	common.BaseTool
+var FileReadTool = common.BaseTool{
+	Name:        "file_read",
+	Description: "用于读取文件内容",
+	Parameters: map[string]interface{}{
+		"file_path": map[string]interface{}{
+			"type":        "string",
+			"description": "文件路径",
+		},
+		"required": []string{"file_path"},
+	},
+	Call: handlerFileRead,
 }
 
-func (f *FileRead) Name() string {
-	return "file_read"
-}
-
-// 小文件处理
-func (f *FileRead) Description() string {
-	return "Read a file and return the content,"
-}
-
-func (f *FileRead) Call(ctx context.Context, input string) (string, error) {
+func handlerFileRead(ctx context.Context, input string) (string, error) {
 	// 解析JSON参数
 	var params struct {
 		FilePath string `json:"file_path"`
@@ -41,16 +41,4 @@ func (f *FileRead) Call(ctx context.Context, input string) (string, error) {
 		return "", err
 	}
 	return string(content), nil
-}
-func (f *FileRead) Parameters() interface{} {
-	return map[string]interface{}{
-		"type": "object",
-		"properties": map[string]interface{}{
-			"file_path": map[string]interface{}{
-				"type":        "string",
-				"description": "The path of the file to read,注意起点为" + "./",
-			},
-		},
-		"required": []string{"file_path"},
-	}
 }

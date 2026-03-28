@@ -1,10 +1,10 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"orange-agent/common"
-	"orange-agent/config/config"
 	"orange-agent/domain"
 	"orange-agent/mysql"
 	"strings"
@@ -13,49 +13,73 @@ import (
 var AgentUpdateTool = common.BaseTool{
 	Name:        "agent_update",
 	Description: "更新Agent配置信息",
-	Parameters: map[string]string{
-		"name":     "Agent名称",
-		"type":     "Agent类型 (可选)",
-		"model":    "默认模型名称 (可选)",
-		"endpoint": "API端点URL (可选)",
-		"api_key":  "API密钥 (可选)",
+	Parameters: map[string]interface{}{
+		"name": map[string]interface{}{
+			"type":        "string",
+			"description": "Agent名称",
+		},
+		"type": map[string]interface{}{
+			"type":        "string",
+			"description": "Agent类型 (可选)",
+		},
+		"model": map[string]interface{}{
+			"type":        "string",
+			"description": "默认模型名称，多个模型用逗号分隔 (可选)",
+		},
+		"endpoint": map[string]interface{}{
+			"type":        "string",
+			"description": "API端点URL (可选)",
+		},
+		"api_key": map[string]interface{}{
+			"type":        "string",
+			"description": "API密钥 (可选)",
+		},
+		"required": []string{"name"},
 	},
-	Required: []string{"name"},
-	Handler:  handleAgentUpdate,
+	Call: handlerAgentUpdate,
 }
 
-func handleAgentUpdate(params map[string]interface{}) (string, error) {
-	name, ok := params["name"].(string)
-	if !ok || name == "" {
-		return "", fmt.Errorf("name 参数不能为空")
+func handlerAgentUpdate(ctx context.Context, input string) (string, error) {
+	// 解析JSON参数
+	var params struct {
+		Name     string `json:"name"`
+		Type     string `json:"type"`
+		Model    string `json:"model"`
+		Endpoint string `json:"endpoint"`
+		ApiKey   string `json:"api_key"`
+	}
+
+	if err := json.Unmarshal([]byte(input), &params); err != nil {
+		return "", fmt.Errorf("failed to parse arguments: %v", err)
+	}
+
+	if params.Name == "" {
+		return "", fmt.Errorf("name is required")
 	}
 
 	var agent domain.AgentConfig
-	if err := config.DB.Where("name = ?", name).First(&agent).Error; err != nil {
-		return "", fmt.Errorf("Agent %s 不存在", name)
+	if err := mysql.GetDB().WithContext(ctx).Where("name = ?", params.Name).First(&agent).Error; err != nil {
+		return "", fmt.Errorf("Agent %s 不存在", params.Name)
 	}
 
 	// 更新可修改字段
-	if endpoint, ok := params["endpoint"].(string); ok && endpoint != "" {
-		agent.BaseUrl = endpoint
+	if params.Endpoint != "" {
+		agent.BaseUrl = params.Endpoint
 	}
-	if apiKey, ok := params["api_key"].(string); ok && apiKey != "" {
-		agent.Token = apiKey
+	if params.ApiKey != "" {
+		agent.Token = params.ApiKey
 	}
-	if model, ok := params["model"].(string); ok && model != "" {
-		agent.Models = strings.Split(model, ",")
+	if params.Model != "" {
+		agent.Models = strings.Split(params.Model, ",")
 	}
 
-	if err := config.DB.Save(&agent).Error; err != nil {
+	if err := mysql.GetDB().WithContext(ctx).Save(&agent).Error; err != nil {
 		return "", fmt.Errorf("更新Agent配置失败: %v", err)
 	}
 
-	// 刷新缓存
-	mysql.LoadAgentCache()
-
 	result := map[string]interface{}{
 		"status":  "success",
-		"message": fmt.Sprintf("Agent %s 更新成功", name),
+		"message": fmt.Sprintf("Agent %s 更新成功", params.Name),
 		"data":    agent,
 	}
 

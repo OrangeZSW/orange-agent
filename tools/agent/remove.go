@@ -1,41 +1,43 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"orange-agent/common"
-	"orange-agent/config/config"
 	"orange-agent/domain"
 	"orange-agent/mysql"
+	"orange-agent/utils"
 )
 
 var AgentRemoveTool = common.BaseTool{
 	Name:        "agent_remove",
 	Description: "删除指定Agent配置",
-	Parameters: map[string]string{
-		"name": "Agent名称",
+	Parameters: map[string]interface{}{
+		"name": map[string]interface{}{
+			"type":        "string",
+			"description": "Agent名称",
+		},
+		"required": []string{"name"},
 	},
-	Required: []string{"name"},
-	Handler:  handleAgentRemove,
+	Call: handleAgentRemove,
 }
 
-func handleAgentRemove(params map[string]interface{}) (string, error) {
-	name, ok := params["name"].(string)
-	if !ok || name == "" {
-		return "", fmt.Errorf("name 参数不能为空")
+func handleAgentRemove(ctx context.Context, input string) (string, error) {
+	params, err := utils.StrToMap(input)
+	if err != nil {
+		return "", err
 	}
+	name := params["name"].(string)
 
 	var agent domain.AgentConfig
-	if err := config.DB.Where("name = ?", name).First(&agent).Error; err != nil {
+	if err := mysql.GetDB().Where("name = ?", name).First(&agent).Error; err != nil {
 		return "", fmt.Errorf("Agent %s 不存在", name)
 	}
 
-	if err := config.DB.Delete(&agent).Error; err != nil {
+	if err := mysql.GetDB().Delete(&agent).Error; err != nil {
 		return "", fmt.Errorf("删除Agent配置失败: %v", err)
 	}
-
-	// 刷新缓存
-	mysql.LoadAgentCache()
 
 	result := map[string]interface{}{
 		"status":  "success",

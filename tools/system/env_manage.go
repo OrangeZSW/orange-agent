@@ -8,19 +8,30 @@ import (
 	"os"
 )
 
-type EnvManageTools struct {
-	common.BaseTool
+var EnvManageTool = common.BaseTool{
+	Name:        "env_manage",
+	Description: "管理环境变量（获取或设置）",
+	Parameters: map[string]interface{}{
+		"action": map[string]interface{}{
+			"type":        "string",
+			"description": "操作类型：get（获取）、set（设置）、list（列出所有）",
+			"enum":        []interface{}{"get", "set", "list"},
+		},
+		"key": map[string]interface{}{
+			"type":        "string",
+			"description": "环境变量名（当action为get或set时需要）",
+		},
+		"value": map[string]interface{}{
+			"type":        "string",
+			"description": "环境变量值（当action为set时需要）",
+		},
+		"required": []string{"action"},
+	},
+	Call: handlerEnvManage,
 }
 
-func (e *EnvManageTools) Name() string {
-	return "env_manage"
-}
-
-func (e *EnvManageTools) Description() string {
-	return "管理环境变量（获取或设置）"
-}
-
-func (e *EnvManageTools) Call(ctx context.Context, input string) (string, error) {
+func handlerEnvManage(ctx context.Context, input string) (string, error) {
+	// 解析JSON参数
 	var params struct {
 		Action string `json:"action"`
 		Key    string `json:"key"`
@@ -50,9 +61,9 @@ func (e *EnvManageTools) Call(ctx context.Context, input string) (string, error)
 		}
 		val := os.Getenv(params.Key)
 		if val == "" {
-			return "环境变量 " + params.Key + " 未设置", nil
+			return fmt.Sprintf("环境变量 %s 未设置", params.Key), nil
 		}
-		return params.Key + "=" + val, nil
+		return fmt.Sprintf("%s=%s", params.Key, val), nil
 
 	case "set":
 		if params.Key == "" || params.Value == "" {
@@ -62,31 +73,9 @@ func (e *EnvManageTools) Call(ctx context.Context, input string) (string, error)
 		if err != nil {
 			return "", err
 		}
-		return "已设置环境变量：" + params.Key + "=" + params.Value, nil
+		return fmt.Sprintf("已设置环境变量：%s=%s", params.Key, params.Value), nil
 
 	default:
 		return "", fmt.Errorf("invalid action: %s", params.Action)
-	}
-}
-
-func (e *EnvManageTools) Parameters() interface{} {
-	return map[string]interface{}{
-		"type": "object",
-		"properties": map[string]interface{}{
-			"action": map[string]interface{}{
-				"type":        "string",
-				"description": "操作类型：get（获取）、set（设置）、list（列出所有）",
-				"enum":        []interface{}{"get", "set", "list"},
-			},
-			"key": map[string]interface{}{
-				"type":        "string",
-				"description": "环境变量名（当action为get或set时需要）",
-			},
-			"value": map[string]interface{}{
-				"type":        "string",
-				"description": "环境变量值（当action为set时需要）",
-			},
-		},
-		"required": []string{"action"},
 	}
 }

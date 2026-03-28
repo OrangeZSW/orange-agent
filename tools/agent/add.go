@@ -1,10 +1,10 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"orange-agent/common"
-	"orange-agent/config/config"
 	"orange-agent/domain"
 	"orange-agent/mysql"
 	"strings"
@@ -13,63 +13,83 @@ import (
 var AgentAddTool = common.BaseTool{
 	Name:        "agent_add",
 	Description: "添加新的Agent配置",
-	Parameters: map[string]string{
-		"name":     "Agent名称",
-		"type":     "Agent类型 (doubao/openai/other)",
-		"model":    "默认模型名称",
-		"endpoint": "API端点URL",
-		"api_key":  "API密钥",
+	Parameters: map[string]interface{}{
+		"name": map[string]interface{}{
+			"type":        "string",
+			"description": "Agent名称",
+		},
+		"type": map[string]interface{}{
+			"type":        "string",
+			"description": "Agent类型 (doubao/openai/other)",
+		},
+		"model": map[string]interface{}{
+			"type":        "string",
+			"description": "默认模型名称，多个模型用逗号分隔",
+		},
+		"endpoint": map[string]interface{}{
+			"type":        "string",
+			"description": "API端点URL",
+		},
+		"api_key": map[string]interface{}{
+			"type":        "string",
+			"description": "API密钥",
+		},
+		"required": []string{"name", "endpoint", "api_key"},
 	},
-	Required: []string{"name", "endpoint", "api_key"},
-	Handler:  handleAgentAdd,
+	Call: handlerAgentAdd,
 }
 
-func handleAgentAdd(params map[string]interface{}) (string, error) {
-	name, ok := params["name"].(string)
-	if !ok || name == "" {
-		return "", fmt.Errorf("name 参数不能为空")
+func handlerAgentAdd(ctx context.Context, input string) (string, error) {
+	// 解析JSON参数
+	var params struct {
+		Name     string `json:"name"`
+		Type     string `json:"type"`
+		Model    string `json:"model"`
+		Endpoint string `json:"endpoint"`
+		ApiKey   string `json:"api_key"`
 	}
 
-	agentType, _ := params["type"].(string)
-	model, _ := params["model"].(string)
-	endpoint, ok := params["endpoint"].(string)
-	if !ok || endpoint == "" {
-		return "", fmt.Errorf("endpoint 参数不能为空")
+	if err := json.Unmarshal([]byte(input), &params); err != nil {
+		return "", fmt.Errorf("failed to parse arguments: %v", err)
 	}
 
-	apiKey, ok := params["api_key"].(string)
-	if !ok || apiKey == "" {
-		return "", fmt.Errorf("api_key 参数不能为空")
+	// 参数验证
+	if params.Name == "" {
+		return "", fmt.Errorf("name is required")
+	}
+	if params.Endpoint == "" {
+		return "", fmt.Errorf("endpoint is required")
+	}
+	if params.ApiKey == "" {
+		return "", fmt.Errorf("api_key is required")
 	}
 
 	// 检查是否已存在
 	var existing domain.AgentConfig
-	if err := config.DB.Where("name = ?", name).First(&existing).Error; err == nil {
-		return "", fmt.Errorf("Agent %s 已存在", name)
+	if err := mysql.GetDB().WithContext(ctx).Where("name = ?", params.Name).First(&existing).Error; err == nil {
+		return "", fmt.Errorf("Agent %s 已存在", params.Name)
 	}
 
+	// 处理模型列表
 	var models []string
-	if model != "" {
-		models = strings.Split(model, ",")
+	if params.Model != "" {
+		models = strings.Split(params.Model, ",")
 	}
 
 	agentConfig := domain.AgentConfig{
-		Name:    name,
-		Token:   apiKey,
-		BaseUrl: endpoint,
+		Name:    params.Name,
+		Token:   params.ApiKey,
+		BaseUrl: params.Endpoint,
 		Models:  models,
 	}
 
-	if err := config.DB.Create(&agentConfig).Error; err != nil {
+	if err := mysql.GetDB().WithContext(ctx).Create(&agentConfig).Error; err != nil {
 		return "", fmt.Errorf("创建Agent配置失败: %v", err)
 	}
 
-	// 刷新缓存
-	mysql.LoadAgentCache()
-
 	result := map[string]interface{}{
 		"status":  "success",
-		"message": fmt.Sprintf("Agent %s 添加成功", name),
+		"message": fmt.Sprintf("Agent %s 添加成功", params.Name),
 		"data":    agentConfig,
 	}
 

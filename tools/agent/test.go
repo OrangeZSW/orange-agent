@@ -2,35 +2,58 @@ package agent
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"orange-agent/common"
-	"orange-agent/config/config"
 	"orange-agent/domain"
+	"orange-agent/mysql"
 	"time"
 )
 
 var AgentTestTool = common.BaseTool{
 	Name:        "agent_test",
 	Description: "测试Agent连接状态",
-	Parameters: map[string]string{
-		"name": "Agent名称",
+	Parameters: map[string]interface{}{
+		"name": map[string]interface{}{
+			"type":        "string",
+			"description": "Agent名称",
+		},
+		"required": []string{"name"},
 	},
-	Required: []string{"name"},
-	Handler:  handleAgentTest,
+	Call: handlerAgentTest,
 }
 
-func handleAgentTest(params map[string]interface{}) (string, error) {
-	name, ok := params["name"].(string)
-	if !ok || name == "" {
-		return "", fmt.Errorf("name 参数不能为空")
+func handlerAgentTest(ctx context.Context, input string) (string, error) {
+	// 解析JSON参数
+	var params struct {
+		Name string `json:"name"`
+	}
+
+	if err := json.Unmarshal([]byte(input), &params); err != nil {
+		return "", fmt.Errorf("failed to parse arguments: %v", err)
+	}
+
+	if params.Name == "" {
+		return "", fmt.Errorf("name is required")
 	}
 
 	var agent domain.AgentConfig
-	if err := config.DB.Where("name = ?", name).First(&agent).Error; err != nil {
-		return "", fmt.Errorf("Agent %s 不存在", name)
+	if err := mysql.GetDB().WithContext(ctx).Where("name = ?", params.Name).First(&agent).Error; err != nil {
+		return "", fmt.Errorf("Agent %s 不存在", params.Name)
+	}
+
+	// 检查是否有模型
+	if len(agent.Models) == 0 {
+		result := map[string]interface{}{
+			"status":  "error",
+			"message": fmt.Sprintf("Agent %s 没有配置模型", params.Name),
+			"name":    params.Name,
+		}
+		jsonResult, _ := json.MarshalIndent(result, "", "  ")
+		return string(jsonResult), nil
 	}
 
 	// 创建测试请求
@@ -53,7 +76,7 @@ func handleAgentTest(params map[string]interface{}) (string, error) {
 		result := map[string]interface{}{
 			"status":  "error",
 			"message": fmt.Sprintf("创建请求失败: %v", err),
-			"name":    name,
+			"name":    params.Name,
 		}
 		jsonResult, _ := json.MarshalIndent(result, "", "  ")
 		return string(jsonResult), nil
@@ -68,9 +91,9 @@ func handleAgentTest(params map[string]interface{}) (string, error) {
 
 	if err != nil {
 		result := map[string]interface{}{
-			"status":    "error",
-			"message":   fmt.Sprintf("连接失败: %v", err),
-			"name":      name,
+			"status":     "error",
+			"message":    fmt.Sprintf("连接失败: %v", err),
+			"name":       params.Name,
 			"latency_ms": elapsed.Milliseconds(),
 		}
 		jsonResult, _ := json.MarshalIndent(result, "", "  ")
@@ -82,11 +105,11 @@ func handleAgentTest(params map[string]interface{}) (string, error) {
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		result := map[string]interface{}{
-			"status":     "success",
-			"message":    "连接测试成功",
-			"name":       name,
+			"status":      "success",
+			"message":     "连接测试成功",
+			"name":        params.Name,
 			"status_code": resp.StatusCode,
-			"latency_ms": elapsed.Milliseconds(),
+			"latency_ms":  elapsed.Milliseconds(),
 		}
 		jsonResult, _ := json.MarshalIndent(result, "", "  ")
 		return string(jsonResult), nil
@@ -95,7 +118,7 @@ func handleAgentTest(params map[string]interface{}) (string, error) {
 	result := map[string]interface{}{
 		"status":      "error",
 		"message":     fmt.Sprintf("连接测试失败，状态码: %d", resp.StatusCode),
-		"name":        name,
+		"name":        params.Name,
 		"status_code": resp.StatusCode,
 		"response":    string(body),
 		"latency_ms":  elapsed.Milliseconds(),

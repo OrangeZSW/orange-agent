@@ -8,19 +8,24 @@ import (
 	"os/exec"
 )
 
-type GitPush struct {
-	common.BaseTool
+var GitPushTool = common.BaseTool{
+	Name:        "git_push",
+	Description: "推送本地提交到远程仓库，支持推送到指定分支",
+	Parameters: map[string]interface{}{
+		"branch": map[string]interface{}{
+			"type":        "string",
+			"description": "可选：要推送的具体分支，不提供则推送所有跟踪的分支",
+		},
+		"force": map[string]interface{}{
+			"type":        "boolean",
+			"description": "可选：如果为 true，执行强制推送，请谨慎使用",
+		},
+	},
+	Call: handlerGitPush,
 }
 
-func (g *GitPush) Name() string {
-	return "git_push"
-}
-
-func (g *GitPush) Description() string {
-	return "Push local commits to the remote repository. Supports pushing to a specific branch or all branches."
-}
-
-func (g *GitPush) Call(ctx context.Context, input string) (string, error) {
+func handlerGitPush(ctx context.Context, input string) (string, error) {
+	// 解析JSON参数
 	var params struct {
 		Branch string `json:"branch"`
 		Force  bool   `json:"force"`
@@ -47,21 +52,4 @@ func (g *GitPush) Call(ctx context.Context, input string) (string, error) {
 	}
 
 	return string(output), nil
-}
-
-func (g *GitPush) Parameters() interface{} {
-	return map[string]interface{}{
-		"type": "object",
-		"properties": map[string]interface{}{
-			"branch": map[string]interface{}{
-				"type":        "string",
-				"description": "Optional: specific branch to push. If not provided, pushes all tracked branches.",
-			},
-			"force": map[string]interface{}{
-				"type":        "boolean",
-				"description": "Optional: if true, performs a force push. Use with caution.",
-			},
-		},
-		"required": []string{},
-	}
 }

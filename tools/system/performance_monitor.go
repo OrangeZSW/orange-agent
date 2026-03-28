@@ -7,19 +7,26 @@ import (
 	"orange-agent/common"
 )
 
-type PerformanceMonitorTools struct {
-	common.BaseTool
+var PerformanceMonitorTool = common.BaseTool{
+	Name:        "performance_monitor",
+	Description: "监控系统性能指标（CPU、内存、磁盘等）",
+	Parameters: map[string]interface{}{
+		"metric": map[string]interface{}{
+			"type":        "string",
+			"description": "要监控的指标：cpu、memory、disk、all",
+			"enum":        []interface{}{"cpu", "memory", "disk", "all"},
+		},
+		"interval": map[string]interface{}{
+			"type":        "integer",
+			"description": "采样间隔（秒，可选，默认为1秒）",
+		},
+		"required": []string{"metric"},
+	},
+	Call: handlerPerformanceMonitor,
 }
 
-func (p *PerformanceMonitorTools) Name() string {
-	return "performance_monitor"
-}
-
-func (p *PerformanceMonitorTools) Description() string {
-	return "监控系统性能指标（CPU、内存、磁盘等）"
-}
-
-func (p *PerformanceMonitorTools) Call(ctx context.Context, input string) (string, error) {
+func handlerPerformanceMonitor(ctx context.Context, input string) (string, error) {
+	// 解析JSON参数
 	var params struct {
 		Metric   string `json:"metric"`
 		Interval int    `json:"interval"`
@@ -53,22 +60,4 @@ func (p *PerformanceMonitorTools) Call(ctx context.Context, input string) (strin
 	}
 
 	return result, nil
-}
-
-func (p *PerformanceMonitorTools) Parameters() interface{} {
-	return map[string]interface{}{
-		"type": "object",
-		"properties": map[string]interface{}{
-			"metric": map[string]interface{}{
-				"type":        "string",
-				"description": "要监控的指标：cpu、memory、disk、all",
-				"enum":        []interface{}{"cpu", "memory", "disk", "all"},
-			},
-			"interval": map[string]interface{}{
-				"type":        "integer",
-				"description": "采样间隔（秒，可选，默认为1秒）",
-			},
-		},
-		"required": []string{"metric"},
-	}
 }

@@ -18,7 +18,7 @@ var Once sync.Once
 func InitTools() {
 	Once.Do(func() {
 		Tools = append(Tools, file.FileTools...)
-		Tools = append(Tools, TimeTools...)
+		Tools = append(Tools, CurrTimeTool)
 		Tools = append(Tools, git.GitTools...)
 		Tools = append(Tools, system.SystemTools...)
 		Tools = append(Tools, agent.AgentTools...)
@@ -29,7 +29,7 @@ func GetTools() map[string]common.BaseTool {
 	InitTools()
 	data := make(map[string]common.BaseTool, len(Tools))
 	for _, tool := range Tools {
-		data[tool.Name()] = tool
+		data[tool.Name] = tool
 	}
 	return data
 }
@@ -42,9 +42,9 @@ func GetEllTools() []llms.Tool {
 		llmTool := llms.Tool{
 			Type: "function",
 			Function: &llms.FunctionDefinition{
-				Name:        t.Name(),        // 获取工具名称
-				Description: t.Description(), // 获取工具描述
-				Parameters:  t.Parameters(),
+				Name:        t.Name,
+				Description: t.Description,
+				Parameters:  t.Parameters,
 			},
 		}
 		llmTools = append(llmTools, llmTool)

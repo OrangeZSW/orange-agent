@@ -10,19 +10,25 @@ import (
 	"strings"
 )
 
-type FileSearchTools struct {
-	common.BaseTool
+var FileSearchTool = common.BaseTool{
+	Name:        "file_search",
+	Description: "在项目中搜索包含特定内容的文件",
+	Parameters: map[string]interface{}{
+		"pattern": map[string]interface{}{
+			"type":        "string",
+			"description": "要搜索的内容或文件名模式",
+		},
+		"directory": map[string]interface{}{
+			"type":        "string",
+			"description": "搜索的目录（可选，默认为当前目录）",
+		},
+		"required": []string{"pattern"},
+	},
+	Call: handlerFileSearch,
 }
 
-func (f *FileSearchTools) Name() string {
-	return "file_search"
-}
-
-func (f *FileSearchTools) Description() string {
-	return "在项目中搜索包含特定内容的文件"
-}
-
-func (f *FileSearchTools) Call(ctx context.Context, input string) (string, error) {
+func handlerFileSearch(ctx context.Context, input string) (string, error) {
+	// 解析JSON参数
 	var params struct {
 		Pattern   string `json:"pattern"`
 		Directory string `json:"directory"`
@@ -96,21 +102,4 @@ func isTextFile(filename string) bool {
 		}
 	}
 	return false
-}
-
-func (f *FileSearchTools) Parameters() interface{} {
-	return map[string]interface{}{
-		"type": "object",
-		"properties": map[string]interface{}{
-			"pattern": map[string]interface{}{
-				"type":        "string",
-				"description": "要搜索的内容或文件名模式",
-			},
-			"directory": map[string]interface{}{
-				"type":        "string",
-				"description": "搜索的目录（可选，默认为当前目录）",
-			},
-		},
-		"required": []string{"pattern"},
-	}
 }

@@ -21,7 +21,7 @@ func (b *BuildTools) Description() string {
 func (b *BuildTools) Call(ctx context.Context, input string) (string, error) {
 	cmd := exec.Command("bash", "-c", "chmod +x ./build.sh && ./build.sh")
 	output, err := cmd.CombinedOutput()
-	
+
 	result := "Build output:\n" + string(output)
 	if err != nil {
 		result += "\n\nBuild failed with error: " + err.Error()

@@ -7,18 +7,14 @@ import (
 	"strings"
 )
 
-type FileList struct {
-	common.BaseTool
+var FileListTool = common.BaseTool{
+	Name:        "file_list",
+	Description: "list all files in the current directory",
+	Call:        handlerFileList,
+	Parameters:  map[string]interface{}{},
 }
 
-func (f *FileList) Name() string {
-	return "file_list"
-}
-
-func (f *FileList) Description() string {
-	return "list all files in the current directory"
-}
-func (f *FileList) Call(ctx context.Context, input string) (string, error) {
+func handlerFileList(ctx context.Context, input string) (string, error) {
 	fileList, err := file.GetFileTree(".")
 	if err != nil {
 		return "", err
@@ -41,12 +37,4 @@ func (f *FileList) Call(ctx context.Context, input string) (string, error) {
 
 	traverse(fileList)
 	return builder.String(), nil
-}
-
-func (f *FileList) Parameters() interface{} {
-	return map[string]interface{}{
-		"type":       "object",
-		"properties": map[string]interface{}{},
-		"required":   []string{},
-	}
 }

@@ -10,19 +10,30 @@ import (
 	"strings"
 )
 
-type ApiTesterTools struct {
-	common.BaseTool
+var ApiTesterTool = common.BaseTool{
+	Name:        "api_tester",
+	Description: "测试API接口（支持GET、POST等方法）",
+	Parameters: map[string]interface{}{
+		"url": map[string]interface{}{
+			"type":        "string",
+			"description": "API接口URL",
+		},
+		"method": map[string]interface{}{
+			"type":        "string",
+			"description": "HTTP方法：GET、POST、PUT、DELETE等",
+			"enum":        []interface{}{"GET", "POST", "PUT", "DELETE"},
+		},
+		"data": map[string]interface{}{
+			"type":        "string",
+			"description": "请求数据（JSON格式，可选）",
+		},
+		"required": []string{"url", "method"},
+	},
+	Call: handlerApiTester,
 }
 
-func (a *ApiTesterTools) Name() string {
-	return "api_tester"
-}
-
-func (a *ApiTesterTools) Description() string {
-	return "测试API接口（支持GET、POST等方法）"
-}
-
-func (a *ApiTesterTools) Call(ctx context.Context, input string) (string, error) {
+func handlerApiTester(ctx context.Context, input string) (string, error) {
+	// 解析JSON参数
 	var params struct {
 		URL    string `json:"url"`
 		Method string `json:"method"`
@@ -72,26 +83,4 @@ func (a *ApiTesterTools) Call(ctx context.Context, input string) (string, error)
 
 	result := fmt.Sprintf("Status: %s\nHeaders: %v\nBody: %s", resp.Status, resp.Header, string(body))
 	return result, nil
-}
-
-func (a *ApiTesterTools) Parameters() interface{} {
-	return map[string]interface{}{
-		"type": "object",
-		"properties": map[string]interface{}{
-			"url": map[string]interface{}{
-				"type":        "string",
-				"description": "API接口URL",
-			},
-			"method": map[string]interface{}{
-				"type":        "string",
-				"description": "HTTP方法：GET、POST、PUT、DELETE等",
-				"enum":        []interface{}{"GET", "POST", "PUT", "DELETE"},
-			},
-			"data": map[string]interface{}{
-				"type":        "string",
-				"description": "请求数据（JSON格式，可选）",
-			},
-		},
-		"required": []string{"url", "method"},
-	}
 }

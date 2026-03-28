@@ -9,19 +9,27 @@ import (
 	"os"
 )
 
-type FileCopyTools struct {
-	common.BaseTool
+var FileCopyTools = common.BaseTool{
+	Name:        "file_copy",
+	Description: "复制文件",
+	Parameters: map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"source_path": map[string]interface{}{
+				"type":        "string",
+				"description": "源文件路径",
+			},
+			"dest_path": map[string]interface{}{
+				"type":        "string",
+				"description": "目标文件路径",
+			},
+		},
+		"required": []string{"source_path", "dest_path"},
+	},
+	Call: handlerFileCopy,
 }
 
-func (f *FileCopyTools) Name() string {
-	return "file_copy"
-}
-
-func (f *FileCopyTools) Description() string {
-	return "复制文件或目录"
-}
-
-func (f *FileCopyTools) Call(ctx context.Context, input string) (string, error) {
+func handlerFileCopy(ctx context.Context, input string) (string, error) {
 	var params struct {
 		SourcePath string `json:"source_path"`
 		DestPath   string `json:"dest_path"`
@@ -53,21 +61,4 @@ func (f *FileCopyTools) Call(ctx context.Context, input string) (string, error) 
 	}
 
 	return "文件已成功复制：" + params.SourcePath + " -> " + params.DestPath, nil
-}
-
-func (f *FileCopyTools) Parameters() interface{} {
-	return map[string]interface{}{
-		"type": "object",
-		"properties": map[string]interface{}{
-			"source_path": map[string]interface{}{
-				"type":        "string",
-				"description": "源文件路径",
-			},
-			"dest_path": map[string]interface{}{
-				"type":        "string",
-				"description": "目标文件路径",
-			},
-		},
-		"required": []string{"source_path", "dest_path"},
-	}
 }
