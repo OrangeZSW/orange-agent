@@ -2,17 +2,18 @@ package tools
 
 import (
 	"context"
+	"orange-agent/common"
 	"time"
 )
 
 var (
-	TimeTools = []BaseTool{
+	TimeTools = []common.BaseTool{
 		&CurrTime{},
 	}
 )
 
 type CurrTime struct {
-	BaseTool
+	common.BaseTool
 }
 
 // Name

@@ -1,29 +1,27 @@
 package tools
 
 import (
+	"orange-agent/common"
+	"orange-agent/tools/file"
 	"sync"
 
 	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/tools"
 )
 
-var Tools []BaseTool
+var Tools []common.BaseTool
+
 var Once sync.Once
 
-type BaseTool interface {
-	tools.Tool
-	Parameters() interface{}
-}
-
-func RegisterTools() {
+func InitTools() {
 	Once.Do(func() {
+		Tools = append(Tools, file.FileTools...)
 		Tools = append(Tools, TimeTools...)
 	})
 }
 
-func GetTools() map[string]BaseTool {
-	RegisterTools()
-	data := make(map[string]BaseTool, len(Tools))
+func GetTools() map[string]common.BaseTool {
+	InitTools()
+	data := make(map[string]common.BaseTool, len(Tools))
 	for _, tool := range Tools {
 		data[tool.Name()] = tool
 	}
@@ -31,7 +29,7 @@ func GetTools() map[string]BaseTool {
 }
 
 func GetEllTools() []llms.Tool {
-	RegisterTools()
+	InitTools()
 	llmTools := make([]llms.Tool, 0, len(Tools))
 	for _, t := range Tools {
 		// 为每个工具构建 llms.Tool 结构体

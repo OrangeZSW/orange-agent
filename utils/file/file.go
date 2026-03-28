@@ -3,7 +3,9 @@ package file
 import (
 	"bufio"
 	"io"
+	"orange-agent/common"
 	"os"
+	"path/filepath"
 )
 
 // 场景	推荐方法
@@ -108,4 +110,42 @@ func ReadRandomAccess(filePath string, offset int64, length int64) ([]byte, erro
 	}
 
 	return buffer[:n], nil
+}
+
+func GetFileTree(rootPath string) ([]*common.FileNode, error) {
+	var result []*common.FileNode
+
+	// 读取目录内容
+	entries, err := os.ReadDir(rootPath)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() && entry.Name() == ".git" {
+			continue
+		}
+
+		node := &common.FileNode{
+			Name:     entry.Name(),
+			IsDir:    entry.IsDir(),
+			Path:     filepath.Join(rootPath, entry.Name()),
+			Children: []*common.FileNode{},
+		}
+
+		// 如果是目录，递归获取子文件
+		if entry.IsDir() {
+			children, err := GetFileTree(node.Path)
+			if err != nil {
+				// 如果无法读取子目录，可以选择继续或返回错误
+				// 这里选择继续，只记录错误
+				continue
+			}
+			node.Children = children
+		}
+
+		result = append(result, node)
+	}
+
+	return result, nil
 }

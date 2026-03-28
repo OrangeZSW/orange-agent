@@ -36,6 +36,7 @@ func (l *Answer) Answer(user domain.User, question string, promete string) strin
 	llm := l.lanchain.GetLLM(user.ModelName)
 	messages := l.buildMessages(user, question, promete)
 	l.log.Info("开始调用模型[%s][%s]", l.lanchain.agentConfig.Name, user.ModelName)
+	l.log.Info("当前系统工具:%v", tools.GetTools())
 	answer, err := llm.GenerateContent(ctx, messages, llms.WithTools(tools.GetEllTools()))
 	if err != nil {
 		l.log.Error("调用模型失败: %v", err)
@@ -90,7 +91,7 @@ func (l *Answer) HandlerTools(ctx context.Context, user domain.User, message []l
 			},
 		})
 
-		l.log.Info("执行工具调用：%-10s,参数：%s", toolrecall.FunctionCall.Name, toolrecall.FunctionCall.Arguments)
+		l.log.Info("执行工具调用：%-10s,参数：%.20s", toolrecall.FunctionCall.Name, toolrecall.FunctionCall.Arguments)
 		// 解析参数（假设参数是JSON字符串）
 		var args map[string]interface{}
 		if err := json.Unmarshal([]byte(toolrecall.FunctionCall.Arguments), &args); err != nil {
@@ -111,8 +112,9 @@ func (l *Answer) HandlerTools(ctx context.Context, user domain.User, message []l
 				Content:    "执行工具失败" + err.Error(),
 				Name:       toolrecall.FunctionCall.Name,
 			})
-			continue
+			return "执行工具失败" + err.Error()
 		} else {
+			l.log.Info("工具调用成功：%-10s,结果：%.20s", toolrecall.FunctionCall.Name, res)
 			ToolsMessage.Parts = append(ToolsMessage.Parts, llms.ToolCallResponse{
 				ToolCallID: toolrecall.ID,
 				Content:    res,
@@ -125,7 +127,7 @@ func (l *Answer) HandlerTools(ctx context.Context, user domain.User, message []l
 	message = append(message, ToolsMessage)
 
 	l.log.Info("工具调用结束")
-	l.log.Info("构建的消息: %v", message)
+	l.log.Info("构建的消息: %.5v", message)
 
 	//调用模型
 	answer, err := llm.GenerateContent(ctx, message, llms.WithTools(tools.GetEllTools()))
@@ -133,6 +135,7 @@ func (l *Answer) HandlerTools(ctx context.Context, user domain.User, message []l
 		l.log.Error("调用模型失败: %v", err)
 		return "调用模型失败"
 	}
+	l.saveCallRecord(user, answer)
 
 	return l.HandlerTools(ctx, user, message, answer, llm)
 }
