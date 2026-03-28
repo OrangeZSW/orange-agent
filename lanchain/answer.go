@@ -137,7 +137,7 @@ func (h *AnswerHandler) buildToolMessages(ctx context.Context, toolCalls []llms.
 			},
 		})
 
-		h.logger.Info("执行工具调用：%s，参数：%.50s",
+		h.logger.Info("执行工具调用：%s，参数：%.200s",
 			toolCall.FunctionCall.Name,
 			toolCall.FunctionCall.Arguments)
 
