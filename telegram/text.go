@@ -73,7 +73,7 @@ func (h *HandlerText) OnText(c tele.Context) error {
 	}
 
 	res = res + "\n\n使用toknen数：" + strconv.Itoa(totalTokens)
-	return c.Reply(res, tele.ModeHTML)
+	return c.Reply(res)
 }
 
 func (h *HandlerText) GetUser(telegramId uint, username string) *domain.User {
