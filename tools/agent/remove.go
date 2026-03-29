@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"orange-agent/common"
-	"orange-agent/repository/factory"
+	repo_factory "orange-agent/repository/factory"
 	"orange-agent/utils"
 )
 
@@ -23,7 +23,7 @@ var AgentRemoveTool = common.BaseTool{
 }
 
 func handleAgentRemove(ctx context.Context, input string) (string, error) {
-	repo := factory.NewFactory()
+	repo := repo_factory.NewFactory()
 	params, err := utils.StrToMap(input)
 	if err != nil {
 		return "", err

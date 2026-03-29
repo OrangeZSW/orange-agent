@@ -2,8 +2,8 @@ package telegram
 
 import (
 	"orange-agent/domain"
-	"orange-agent/lanchain"
-	"orange-agent/repository/factory"
+	langchain "orange-agent/lanchain"
+	repo_factory "orange-agent/repository/factory"
 	"orange-agent/utils"
 	"orange-agent/utils/logger"
 
@@ -13,18 +13,18 @@ import (
 type HandlerText struct {
 	telegram    *TelegramBot
 	log         logger.Logger
-	answer      *lanchain.AnswerHandler
-	lanchain    *lanchain.Lnachain
-	repoFactory *factory.Factory
+	answer      *langchain.AnswerHandler
+	lanchain    *langchain.Lnachain
+	repoFactory *repo_factory.Factory
 }
 
 func NewHandlerText(bot *TelegramBot) *HandlerText {
 	res := &HandlerText{
 		telegram:    bot,
 		log:         *logger.GetLogger(),
-		answer:      lanchain.NewAnswerHandler(),
-		lanchain:    lanchain.NewLnachain(),
-		repoFactory: factory.NewFactory(),
+		answer:      langchain.NewAnswerHandler(),
+		lanchain:    langchain.NewLnachain(),
+		repoFactory: repo_factory.NewFactory(),
 	}
 	res.RegisterHandler()
 	return res

@@ -1,10 +1,10 @@
-package lanchain
+package langchain
 
 import (
 	"context"
 	"fmt"
 	"orange-agent/domain"
-	"orange-agent/repository/factory"
+	repo_factory "orange-agent/repository/factory"
 	"orange-agent/tools"
 	"orange-agent/utils"
 	"orange-agent/utils/logger"
@@ -18,14 +18,14 @@ type AnswerHandler struct {
 	langChain *Lnachain
 	logger    *logger.Logger
 	menmory   *domain.Memory
-	repo      factory.Factory
+	repo      *repo_factory.Factory
 }
 
 func NewAnswerHandler() *AnswerHandler {
 	return &AnswerHandler{
 		langChain: NewLnachain(),
 		logger:    logger.GetLogger(),
-		repo:      *factory.NewFactory(),
+		repo:      repo_factory.NewFactory(),
 	}
 }
 

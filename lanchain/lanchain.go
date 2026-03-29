@@ -1,22 +1,22 @@
-package lanchain
+package langchain
 
 import (
 	"orange-agent/domain"
-	"orange-agent/repository/factory"
+	repo_factory "orange-agent/repository/factory"
 	"orange-agent/utils/logger"
 
 	"github.com/tmc/langchaingo/llms/openai"
 )
 
 type Lnachain struct {
-	repoFactory factory.Factory
+	repoFactory repo_factory.Factory
 	log         *logger.Logger
 	agentConfig *domain.AgentConfig
 }
 
 func NewLnachain() *Lnachain {
 	return &Lnachain{
-		repoFactory: *factory.NewFactory(),
+		repoFactory: *repo_factory.NewFactory(),
 		log:         logger.GetLogger(),
 	}
 }

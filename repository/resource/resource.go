@@ -1,4 +1,4 @@
-package dataresource
+package resource
 
 import (
 	"orange-agent/config"

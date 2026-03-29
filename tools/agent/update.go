@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"orange-agent/common"
-	"orange-agent/repository/factory"
+	repo_factory "orange-agent/repository/factory"
 	"strings"
 )
 
@@ -39,7 +39,7 @@ var AgentUpdateTool = common.BaseTool{
 }
 
 func handlerAgentUpdate(ctx context.Context, input string) (string, error) {
-	repo := factory.NewFactory()
+	repo := repo_factory.NewFactory()
 	// 解析JSON参数
 	var params struct {
 		Name     string `json:"name"`

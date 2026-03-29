@@ -1,9 +1,9 @@
-package factory
+package repo_factory
 
 import (
 	"orange-agent/repository"
-	dataresource "orange-agent/repository/data_resource"
 	orange_grom "orange-agent/repository/grom"
+	"orange-agent/repository/resource"
 	"sync"
 )
 
@@ -13,7 +13,7 @@ var (
 )
 
 type Factory struct {
-	dbResource dataresource.DataResource
+	dbResource resource.DataResource
 
 	AgentCallRecordRepo repository.AgentCallRecordRepository
 	AgentConfigRepo     repository.AgentConfigRepository
@@ -24,9 +24,9 @@ type Factory struct {
 func NewFactory() *Factory {
 	once.Do(func() {
 		Factory := &Factory{
-			dbResource: *dataresource.GetDataResource(),
+			dbResource: *resource.GetDataResource(),
 		}
-		gormDB := dataresource.GetDataResource().Mysql.DB
+		gormDB := resource.GetDataResource().Mysql.DB
 
 		if gormDB != nil {
 			Factory.AgentCallRecordRepo = orange_grom.NewAgentCallRecordRepository(gormDB)

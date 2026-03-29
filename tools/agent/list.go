@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"orange-agent/common"
-	"orange-agent/repository/factory"
+	repo_factory "orange-agent/repository/factory"
 )
 
 var AgentListTool = common.BaseTool{
@@ -16,7 +16,7 @@ var AgentListTool = common.BaseTool{
 }
 
 func handleAgentList(ctx context.Context, input string) (string, error) {
-	repo := factory.NewFactory()
+	repo := repo_factory.NewFactory()
 	agents, err := repo.AgentConfigRepo.GetAllAgentConfig()
 	if err != nil {
 		return "", fmt.Errorf("查询Agent列表失败: %v", err)

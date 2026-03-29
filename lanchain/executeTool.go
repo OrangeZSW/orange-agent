@@ -1,4 +1,4 @@
-package lanchain
+package langchain
 
 import (
 	"context"
