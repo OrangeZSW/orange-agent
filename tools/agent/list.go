@@ -5,8 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"orange-agent/common"
-	"orange-agent/domain"
-	"orange-agent/mysql"
+	"orange-agent/repository/factory"
 )
 
 var AgentListTool = common.BaseTool{
@@ -17,8 +16,9 @@ var AgentListTool = common.BaseTool{
 }
 
 func handleAgentList(ctx context.Context, input string) (string, error) {
-	var agents []domain.AgentConfig
-	if err := mysql.GetDB().Find(&agents).Error; err != nil {
+	repo := factory.NewFactory()
+	agents, err := repo.AgentConfigRepo.GetAllAgentConfig()
+	if err != nil {
 		return "", fmt.Errorf("查询Agent列表失败: %v", err)
 	}
 

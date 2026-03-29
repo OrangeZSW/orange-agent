@@ -5,8 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"orange-agent/common"
-	"orange-agent/domain"
-	"orange-agent/mysql"
+	"orange-agent/repository/factory"
 	"orange-agent/utils"
 )
 
@@ -24,18 +23,19 @@ var AgentRemoveTool = common.BaseTool{
 }
 
 func handleAgentRemove(ctx context.Context, input string) (string, error) {
+	repo := factory.NewFactory()
 	params, err := utils.StrToMap(input)
 	if err != nil {
 		return "", err
 	}
 	name := params["name"].(string)
 
-	var agent domain.AgentConfig
-	if err := mysql.GetDB().Where("name = ?", name).First(&agent).Error; err != nil {
+	agent, err := repo.AgentConfigRepo.GetAgentConfigByName(name)
+	if err != nil {
 		return "", fmt.Errorf("Agent %s 不存在", name)
 	}
 
-	if err := mysql.GetDB().Delete(&agent).Error; err != nil {
+	if err := repo.AgentConfigRepo.DeleteAgentConfig(agent); err != nil {
 		return "", fmt.Errorf("删除Agent配置失败: %v", err)
 	}
 

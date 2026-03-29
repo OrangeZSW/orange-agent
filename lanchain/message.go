@@ -84,11 +84,11 @@ func (h *AnswerHandler) buildMessages(user *domain.User, question string, prompt
 	}
 
 	// 添加用户记忆
-	memories, err := h.memorySql.GetMemoryByIdAndSize(user.ID, 3)
+	memories, err := h.repo.MemoryRepo.GetMemoryByIdAndSize(user.ID, 3)
 	if err != nil {
 		h.logger.Error("获取用户记忆失败: %v", err)
 	} else {
-		h.logger.Debug("加载用户记忆：%d 条", len(*memories))
+		h.logger.Debug("加载用户记忆：%d 条", len(memories))
 	}
 
 	// 添加当前问题

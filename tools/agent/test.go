@@ -8,8 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"orange-agent/common"
-	"orange-agent/domain"
-	"orange-agent/mysql"
+	"orange-agent/repository/factory"
 	"time"
 )
 
@@ -27,6 +26,7 @@ var AgentTestTool = common.BaseTool{
 }
 
 func handlerAgentTest(ctx context.Context, input string) (string, error) {
+	repo := factory.NewFactory()
 	// 解析JSON参数
 	var params struct {
 		Name string `json:"name"`
@@ -39,9 +39,8 @@ func handlerAgentTest(ctx context.Context, input string) (string, error) {
 	if params.Name == "" {
 		return "", fmt.Errorf("name is required")
 	}
-
-	var agent domain.AgentConfig
-	if err := mysql.GetDB().WithContext(ctx).Where("name = ?", params.Name).First(&agent).Error; err != nil {
+	agent, err := repo.AgentConfigRepo.GetAgentConfigByName(params.Name)
+	if err != nil {
 		return "", fmt.Errorf("Agent %s 不存在", params.Name)
 	}
 

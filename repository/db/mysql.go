@@ -1,4 +1,4 @@
-package mysql
+package db
 
 import (
 	"orange-agent/config"
@@ -9,37 +9,35 @@ import (
 	"gorm.io/gorm"
 )
 
-var db *gorm.DB
-
 type Mysql struct {
-	db     *gorm.DB
+	DB     *gorm.DB
 	config *config.DatabaseConfig
 }
 
-func NewMysql(config *config.DatabaseConfig) {
+func NewMysql(config *config.DatabaseConfig) (*Mysql, error) {
+	db := &Mysql{
+		config: config,
+	}
 	log := logger.GetLogger()
 	coon, err := gorm.Open(mysql.Open(buildDsn(config)), &gorm.Config{})
 	if err != nil {
 		log.Error("数据库连接失败:%s", err.Error())
-		return
+		return nil, err
 	}
 	log.Info("数据库连接成功")
-	db = coon
-	Migrate() // 迁移
+	db.DB = coon
+	db.config = config
+	Migrate(db) // 迁移
+	return db, nil
 }
 
 func buildDsn(config *config.DatabaseConfig) string {
 	return config.Username + ":" + config.Password + "@tcp(" + config.Host + ":" + config.Port + ")/" + config.Database + "?charset=utf8mb4&parseTime=True&loc=Local"
 }
 
-func GetDB() *gorm.DB {
-	return db
-}
-
 // 迁移
-func Migrate() {
-	db := GetDB()
-	db.AutoMigrate(&domain.AgentConfig{}, &domain.CallRecord{},
+func Migrate(mysql *Mysql) {
+	mysql.DB.AutoMigrate(&domain.AgentConfig{}, &domain.CallRecord{},
 		&domain.Memory{}, &domain.User{},
 	)
 }

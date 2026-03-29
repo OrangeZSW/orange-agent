@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"orange-agent/domain"
-	"orange-agent/mysql"
+	"orange-agent/repository/factory"
 	"orange-agent/tools"
 	"orange-agent/utils"
 	"orange-agent/utils/logger"
@@ -15,19 +15,17 @@ import (
 
 // AnswerHandler 处理用户问题的答案生成
 type AnswerHandler struct {
-	memorySql          *mysql.MemorySql
-	langChain          *Lnachain
-	logger             *logger.Logger
-	agentCallRecordSql *mysql.AgentCallRecordSql
-	menmory            *domain.Memory
+	langChain *Lnachain
+	logger    *logger.Logger
+	menmory   *domain.Memory
+	repo      factory.Factory
 }
 
 func NewAnswerHandler() *AnswerHandler {
 	return &AnswerHandler{
-		memorySql:          mysql.NewMemorySql(),
-		langChain:          NewLnachain(),
-		logger:             logger.GetLogger(),
-		agentCallRecordSql: mysql.NewAgentCallRecordSql(),
+		langChain: NewLnachain(),
+		logger:    logger.GetLogger(),
+		repo:      *factory.NewFactory(),
 	}
 }
 
@@ -100,7 +98,7 @@ func (h *AnswerHandler) saveCallRecord(user *domain.User, response *llms.Content
 		MenmoryId:        h.menmory.ID,
 	}
 
-	if err := h.agentCallRecordSql.CreateAgentCallRecord(callRecord); err != nil {
+	if err := h.repo.AgentCallRecordRepo.CreateAgentCallRecord(callRecord); err != nil {
 		h.logger.Error("保存调用记录失败: %v", err)
 	}
 }

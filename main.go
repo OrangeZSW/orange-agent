@@ -2,7 +2,7 @@ package main
 
 import (
 	"orange-agent/config"
-	"orange-agent/mysql"
+	dataresource "orange-agent/repository/data_resource"
 	"orange-agent/telegram"
 	"orange-agent/utils/logger"
 )
@@ -10,7 +10,7 @@ import (
 func main() {
 	config := config.NewConfig()
 	logger.InitDefaultLogger(config.Logger)
-	mysql.NewMysql(&config.Database)
+	dataresource.GetDataResource().InitMysql(&config.Database)
 
 	bot := telegram.NewTelegramBot(&config.Telegram)
 

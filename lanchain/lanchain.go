@@ -2,26 +2,26 @@ package lanchain
 
 import (
 	"orange-agent/domain"
-	"orange-agent/mysql"
+	"orange-agent/repository/factory"
 	"orange-agent/utils/logger"
 
 	"github.com/tmc/langchaingo/llms/openai"
 )
 
 type Lnachain struct {
-	agentConfigSql *mysql.AgentConfigSql
-	log            *logger.Logger
-	agentConfig    *domain.AgentConfig
+	repoFactory factory.Factory
+	log         *logger.Logger
+	agentConfig *domain.AgentConfig
 }
 
 func NewLnachain() *Lnachain {
 	return &Lnachain{
-		agentConfigSql: mysql.NewAgentConfigSql(),
-		log:            logger.GetLogger(),
+		repoFactory: *factory.NewFactory(),
+		log:         logger.GetLogger(),
 	}
 }
 func (l *Lnachain) GetLLM(model string) *openai.LLM {
-	config, err := l.agentConfigSql.GetAgentConfigByModel(model)
+	config, err := l.repoFactory.AgentConfigRepo.GetAgentConfigByModel(model)
 	l.agentConfig = config
 	if err != nil {
 		l.log.Error("%s模型配置文件获取失败", model)
@@ -36,7 +36,7 @@ func (l *Lnachain) GetLLM(model string) *openai.LLM {
 
 // getdfault model name
 func (l *Lnachain) GetDefaultModelName() string {
-	config, err := l.agentConfigSql.GetAgentConfigByName("default")
+	config, err := l.repoFactory.AgentConfigRepo.GetAgentConfigByName("default")
 	if err != nil {
 		l.log.Error("get default model name error: %v", err)
 	}

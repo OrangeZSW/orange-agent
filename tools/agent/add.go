@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"orange-agent/common"
 	"orange-agent/domain"
-	"orange-agent/mysql"
+	"orange-agent/repository/factory"
 	"strings"
 )
 
@@ -40,6 +40,7 @@ var AgentAddTool = common.BaseTool{
 }
 
 func handlerAgentAdd(ctx context.Context, input string) (string, error) {
+	factory := factory.NewFactory()
 	// 解析JSON参数
 	var params struct {
 		Name     string `json:"name"`
@@ -65,8 +66,7 @@ func handlerAgentAdd(ctx context.Context, input string) (string, error) {
 	}
 
 	// 检查是否已存在
-	var existing domain.AgentConfig
-	if err := mysql.GetDB().WithContext(ctx).Where("name = ?", params.Name).First(&existing).Error; err == nil {
+	if _, err := factory.AgentConfigRepo.GetAgentConfigByName(params.Name); err == nil {
 		return "", fmt.Errorf("Agent %s 已存在", params.Name)
 	}
 
@@ -83,7 +83,7 @@ func handlerAgentAdd(ctx context.Context, input string) (string, error) {
 		Models:  models,
 	}
 
-	if err := mysql.GetDB().WithContext(ctx).Create(&agentConfig).Error; err != nil {
+	if err := factory.AgentConfigRepo.CreateAgentConfig(&agentConfig); err != nil {
 		return "", fmt.Errorf("创建Agent配置失败: %v", err)
 	}
 

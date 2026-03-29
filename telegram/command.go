@@ -2,7 +2,7 @@ package telegram
 
 import (
 	"orange-agent/domain"
-	"orange-agent/mysql"
+	"orange-agent/repository/factory"
 	"orange-agent/utils"
 	"strings"
 
@@ -10,16 +10,14 @@ import (
 )
 
 type HandlerCommand struct {
-	TelegramBot    *TelegramBot
-	agentConfigSql *mysql.AgentConfigSql
-	userSql        *mysql.UserSql
+	repoFactory *factory.Factory
+	TelegramBot *TelegramBot
 }
 
 func NewHandlerCommand(bot *TelegramBot) *HandlerCommand {
 	res := &HandlerCommand{
-		TelegramBot:    bot,
-		agentConfigSql: mysql.NewAgentConfigSql(),
-		userSql:        mysql.NewUserSql(),
+		TelegramBot: bot,
+		repoFactory: factory.NewFactory(),
 	}
 	res.RegisterHandler()
 	return res
@@ -66,7 +64,7 @@ func (tb *HandlerCommand) AddAgent(c tele.Context) error {
 		BaseUrl: parts[2],
 		Token:   parts[3],
 	}
-	tb.agentConfigSql.CreateAgentConfig(agentConfig)
+	tb.repoFactory.AgentConfigRepo.CreateAgentConfig(agentConfig)
 	return c.Reply("添加成功")
 }
 
@@ -75,8 +73,8 @@ func (tb *HandlerCommand) Switch(c tele.Context) error {
 	if len(parts) != 3 {
 		return c.Reply("请输入正确的命令格式：/switch <agent_id> <model_index>")
 	}
-	agentConfig, _ := tb.agentConfigSql.GetAgentConfigById(utils.StrToUint(parts[1]))
-	tb.userSql.UpdateUserModelName(c.Sender().ID, agentConfig.Models[utils.StrToUint(parts[2])-1])
+	agentConfig, _ := tb.repoFactory.AgentConfigRepo.GetAgentConfigById(utils.StrToUint(parts[1]))
+	tb.repoFactory.UserRepo.UpdateUserModelName(c.Sender().ID, agentConfig.Models[utils.StrToUint(parts[2])-1])
 	return c.Reply("切换成功")
 }
 
@@ -85,22 +83,22 @@ func (tb *HandlerCommand) AddModel(c tele.Context) error {
 	if len(parts) != 3 {
 		return c.Reply("请输入正确的命令格式：/addModel <agent_id> <model_name>")
 	}
-	agentConfig, _ := tb.agentConfigSql.GetAgentConfigById(utils.StrToUint(parts[1]))
+	agentConfig, _ := tb.repoFactory.AgentConfigRepo.GetAgentConfigById(utils.StrToUint(parts[1]))
 	agentConfig.Models = append(agentConfig.Models, parts[2])
-	tb.agentConfigSql.UpdateAgentConfig(agentConfig)
+	tb.repoFactory.AgentConfigRepo.UpdateAgentConfig(agentConfig)
 	return c.Reply("添加成功")
 }
 
 func (tb *HandlerCommand) Agents(c tele.Context) error {
-	agents, _ := tb.agentConfigSql.GetAllAgentConfig()
+	agents, _ := tb.repoFactory.AgentConfigRepo.GetAllAgentConfig()
 	var list string
-	for _, agent := range *agents {
+	for _, agent := range agents {
 		list += "id: " + utils.UintToStr(agent.ID) + " name: " + agent.Name + " models: " + strings.Join(agent.Models, ", ") + "\n"
 	}
 	return c.Reply("当前可用的代理：\n" + list)
 }
 
 func (tb *HandlerCommand) Model(c tele.Context) error {
-	user, _ := tb.userSql.GetUserByTelegramId(c.Sender().ID)
+	user, _ := tb.repoFactory.UserRepo.GetUserByTelegramId(c.Sender().ID)
 	return c.Reply("当前使用的模型：" + user.ModelName)
 }

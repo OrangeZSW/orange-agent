@@ -5,8 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"orange-agent/common"
-	"orange-agent/domain"
-	"orange-agent/mysql"
+	"orange-agent/repository/factory"
 	"strings"
 )
 
@@ -40,6 +39,7 @@ var AgentUpdateTool = common.BaseTool{
 }
 
 func handlerAgentUpdate(ctx context.Context, input string) (string, error) {
+	repo := factory.NewFactory()
 	// 解析JSON参数
 	var params struct {
 		Name     string `json:"name"`
@@ -57,8 +57,8 @@ func handlerAgentUpdate(ctx context.Context, input string) (string, error) {
 		return "", fmt.Errorf("name is required")
 	}
 
-	var agent domain.AgentConfig
-	if err := mysql.GetDB().WithContext(ctx).Where("name = ?", params.Name).First(&agent).Error; err != nil {
+	agent, err := repo.AgentConfigRepo.GetAgentConfigByName(params.Name)
+	if err != nil {
 		return "", fmt.Errorf("Agent %s 不存在", params.Name)
 	}
 
@@ -73,7 +73,7 @@ func handlerAgentUpdate(ctx context.Context, input string) (string, error) {
 		agent.Models = strings.Split(params.Model, ",")
 	}
 
-	if err := mysql.GetDB().WithContext(ctx).Save(&agent).Error; err != nil {
+	if err := repo.AgentConfigRepo.UpdateAgentConfig(agent); err != nil {
 		return "", fmt.Errorf("更新Agent配置失败: %v", err)
 	}
 
