@@ -12,13 +12,16 @@ var GitDiffTool = common.BaseTool{
 	Name:        "git_diff",
 	Description: "执行 git diff 命令，显示仓库中的更改，支持指定文件或暂存区/未暂存区的差异",
 	Parameters: map[string]interface{}{
-		"file": map[string]interface{}{
-			"type":        "string",
-			"description": "可选：要显示差异的具体文件，不提供则显示所有未暂存的更改",
-		},
-		"staged": map[string]interface{}{
-			"type":        "boolean",
-			"description": "可选：如果为 true，显示已暂存的更改（相当于 --cached），默认为 false",
+		"type": "object",
+		"properties": map[string]interface{}{
+			"file": map[string]interface{}{
+				"type":        "string",
+				"description": "可选：要显示差异的具体文件，不提供则显示所有未暂存的更改",
+			},
+			"staged": map[string]interface{}{
+				"type":        "boolean",
+				"description": "可选：如果为 true，显示已暂存的更改（相当于 --cached），默认为 false",
+			},
 		},
 	},
 	Call: handlerGitDiff,

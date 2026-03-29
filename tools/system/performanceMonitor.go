@@ -11,14 +11,17 @@ var PerformanceMonitorTool = common.BaseTool{
 	Name:        "performance_monitor",
 	Description: "监控系统性能指标（CPU、内存、磁盘等）",
 	Parameters: map[string]interface{}{
-		"metric": map[string]interface{}{
-			"type":        "string",
-			"description": "要监控的指标：cpu、memory、disk、all",
-			"enum":        []interface{}{"cpu", "memory", "disk", "all"},
-		},
-		"interval": map[string]interface{}{
-			"type":        "integer",
-			"description": "采样间隔（秒，可选，默认为1秒）",
+		"type": "object",
+		"properties": map[string]interface{}{
+			"metric": map[string]interface{}{
+				"type":        "string",
+				"description": "要监控的指标：cpu、memory、disk、all",
+				"enum":        []interface{}{"cpu", "memory", "disk", "all"},
+			},
+			"interval": map[string]interface{}{
+				"type":        "integer",
+				"description": "采样间隔（秒，可选，默认为1秒）",
+			},
 		},
 		"required": []string{"metric"},
 	},

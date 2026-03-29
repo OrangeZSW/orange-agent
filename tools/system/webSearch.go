@@ -18,23 +18,26 @@ var WebSearchTool = common.BaseTool{
 	Name:        "web_search",
 	Description: "联网搜索功能，支持搜索引擎查询和网页内容抓取",
 	Parameters: map[string]interface{}{
-		"query": map[string]interface{}{
-			"type":        "string",
-			"description": "搜索关键词或URL",
-		},
-		"search_type": map[string]interface{}{
-			"type":        "string",
-			"description": "搜索类型：search(搜索引擎搜索)、fetch(抓取网页内容)",
-			"enum":        []interface{}{"search", "fetch"},
-		},
-		"engine": map[string]interface{}{
-			"type":        "string",
-			"description": "搜索引擎：duckduckgo(默认)、google、bing",
-			"enum":        []interface{}{"duckduckgo", "google", "bing"},
-		},
-		"num_results": map[string]interface{}{
-			"type":        "integer",
-			"description": "返回结果数量（默认5条，最多10条）",
+		"type": "object",
+		"properties": map[string]interface{}{
+			"query": map[string]interface{}{
+				"type":        "string",
+				"description": "搜索关键词或URL",
+			},
+			"search_type": map[string]interface{}{
+				"type":        "string",
+				"description": "搜索类型：search(搜索引擎搜索)、fetch(抓取网页内容)",
+				"enum":        []interface{}{"search", "fetch"},
+			},
+			"engine": map[string]interface{}{
+				"type":        "string",
+				"description": "搜索引擎：duckduckgo(默认)、google、bing",
+				"enum":        []interface{}{"duckduckgo", "google", "bing"},
+			},
+			"num_results": map[string]interface{}{
+				"type":        "integer",
+				"description": "返回结果数量（默认5条，最多10条）",
+			},
 		},
 		"required": []string{"query", "search_type"},
 	},

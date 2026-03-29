@@ -14,18 +14,21 @@ var ApiTesterTool = common.BaseTool{
 	Name:        "api_tester",
 	Description: "测试API接口（支持GET、POST等方法）",
 	Parameters: map[string]interface{}{
-		"url": map[string]interface{}{
-			"type":        "string",
-			"description": "API接口URL",
-		},
-		"method": map[string]interface{}{
-			"type":        "string",
-			"description": "HTTP方法：GET、POST、PUT、DELETE等",
-			"enum":        []interface{}{"GET", "POST", "PUT", "DELETE"},
-		},
-		"data": map[string]interface{}{
-			"type":        "string",
-			"description": "请求数据（JSON格式，可选）",
+		"type": "object",
+		"properties": map[string]interface{}{
+			"url": map[string]interface{}{
+				"type":        "string",
+				"description": "API接口URL",
+			},
+			"method": map[string]interface{}{
+				"type":        "string",
+				"description": "HTTP方法：GET、POST、PUT、DELETE等",
+				"enum":        []interface{}{"GET", "POST", "PUT", "DELETE"},
+			},
+			"data": map[string]interface{}{
+				"type":        "string",
+				"description": "请求数据（JSON格式，可选）",
+			},
 		},
 		"required": []string{"url", "method"},
 	},

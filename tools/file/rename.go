@@ -12,13 +12,16 @@ var FileRenameTool = common.BaseTool{
 	Name:        "file_rename",
 	Description: "重命名文件或目录",
 	Parameters: map[string]interface{}{
-		"old_path": map[string]interface{}{
-			"type":        "string",
-			"description": "原文件路径",
-		},
-		"new_path": map[string]interface{}{
-			"type":        "string",
-			"description": "新文件路径",
+		"type": "object",
+		"properties": map[string]interface{}{
+			"old_path": map[string]interface{}{
+				"type":        "string",
+				"description": "原文件路径",
+			},
+			"new_path": map[string]interface{}{
+				"type":        "string",
+				"description": "新文件路径",
+			},
 		},
 		"required": []string{"old_path", "new_path"},
 	},

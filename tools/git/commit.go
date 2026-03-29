@@ -12,9 +12,12 @@ var GitCommitTool = common.BaseTool{
 	Name:        "git_commit",
 	Description: "创建新的提交，自动暂存所有更改",
 	Parameters: map[string]interface{}{
-		"message": map[string]interface{}{
-			"type":        "string",
-			"description": "提交信息，描述更改内容",
+		"type": "object",
+		"properties": map[string]interface{}{
+			"message": map[string]interface{}{
+				"type":        "string",
+				"description": "提交信息，描述更改内容",
+			},
 		},
 		"required": []string{"message"},
 	},

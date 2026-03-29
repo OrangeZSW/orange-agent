@@ -12,13 +12,16 @@ var TestRunTool = common.BaseTool{
 	Name:        "test_run",
 	Description: "运行测试用例",
 	Parameters: map[string]interface{}{
-		"package": map[string]interface{}{
-			"type":        "string",
-			"description": "要测试的包路径（可选，默认为当前目录）",
-		},
-		"verbose": map[string]interface{}{
-			"type":        "boolean",
-			"description": "是否显示详细输出",
+		"type": "object",
+		"properties": map[string]interface{}{
+			"package": map[string]interface{}{
+				"type":        "string",
+				"description": "要测试的包路径（可选，默认为当前目录）",
+			},
+			"verbose": map[string]interface{}{
+				"type":        "boolean",
+				"description": "是否显示详细输出",
+			},
 		},
 	},
 	Call: handlerTestRun,

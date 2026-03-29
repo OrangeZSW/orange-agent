@@ -14,25 +14,28 @@ var AgentAddTool = common.BaseTool{
 	Name:        "agent_add",
 	Description: "添加新的Agent配置",
 	Parameters: map[string]interface{}{
-		"name": map[string]interface{}{
-			"type":        "string",
-			"description": "Agent名称",
-		},
-		"type": map[string]interface{}{
-			"type":        "string",
-			"description": "Agent类型 (doubao/openai/other)",
-		},
-		"model": map[string]interface{}{
-			"type":        "string",
-			"description": "默认模型名称，多个模型用逗号分隔",
-		},
-		"endpoint": map[string]interface{}{
-			"type":        "string",
-			"description": "API端点URL",
-		},
-		"api_key": map[string]interface{}{
-			"type":        "string",
-			"description": "API密钥",
+		"type": "object",
+		"properties": map[string]interface{}{
+			"name": map[string]interface{}{
+				"type":        "string",
+				"description": "Agent名称",
+			},
+			"type": map[string]interface{}{
+				"type":        "string",
+				"description": "Agent类型 (doubao/openai/other)",
+			},
+			"model": map[string]interface{}{
+				"type":        "string",
+				"description": "默认模型名称，多个模型用逗号分隔",
+			},
+			"endpoint": map[string]interface{}{
+				"type":        "string",
+				"description": "API端点URL",
+			},
+			"api_key": map[string]interface{}{
+				"type":        "string",
+				"description": "API密钥",
+			},
 		},
 		"required": []string{"name", "endpoint", "api_key"},
 	},

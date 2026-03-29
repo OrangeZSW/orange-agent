@@ -13,25 +13,28 @@ var AgentUpdateTool = common.BaseTool{
 	Name:        "agent_update",
 	Description: "更新Agent配置信息",
 	Parameters: map[string]interface{}{
-		"name": map[string]interface{}{
-			"type":        "string",
-			"description": "Agent名称",
-		},
-		"type": map[string]interface{}{
-			"type":        "string",
-			"description": "Agent类型 (可选)",
-		},
-		"model": map[string]interface{}{
-			"type":        "string",
-			"description": "默认模型名称，多个模型用逗号分隔 (可选)",
-		},
-		"endpoint": map[string]interface{}{
-			"type":        "string",
-			"description": "API端点URL (可选)",
-		},
-		"api_key": map[string]interface{}{
-			"type":        "string",
-			"description": "API密钥 (可选)",
+		"type": "object",
+		"properties": map[string]interface{}{
+			"name": map[string]interface{}{
+				"type":        "string",
+				"description": "Agent名称",
+			},
+			"type": map[string]interface{}{
+				"type":        "string",
+				"description": "Agent类型 (可选)",
+			},
+			"model": map[string]interface{}{
+				"type":        "string",
+				"description": "默认模型名称，多个模型用逗号分隔 (可选)",
+			},
+			"endpoint": map[string]interface{}{
+				"type":        "string",
+				"description": "API端点URL (可选)",
+			},
+			"api_key": map[string]interface{}{
+				"type":        "string",
+				"description": "API密钥 (可选)",
+			},
 		},
 		"required": []string{"name"},
 	},

@@ -12,9 +12,12 @@ var FileReadTool = common.BaseTool{
 	Name:        "file_read",
 	Description: "用于读取文件内容",
 	Parameters: map[string]interface{}{
-		"file_path": map[string]interface{}{
-			"type":        "string",
-			"description": "文件路径",
+		"type": "object",
+		"properties": map[string]interface{}{
+			"file_path": map[string]interface{}{
+				"type":        "string",
+				"description": "文件路径",
+			},
 		},
 		"required": []string{"file_path"},
 	},

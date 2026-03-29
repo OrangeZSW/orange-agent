@@ -12,13 +12,16 @@ var FileWriteTool = common.BaseTool{
 	Name:        "file_write",
 	Description: "写入文件内容",
 	Parameters: map[string]interface{}{
-		"file_path": map[string]interface{}{
-			"type":        "string",
-			"description": "文件路径，注意起点为 ./",
-		},
-		"content": map[string]interface{}{
-			"type":        "string",
-			"description": "要写入的内容",
+		"type": "object",
+		"properties": map[string]interface{}{
+			"file_path": map[string]interface{}{
+				"type":        "string",
+				"description": "文件路径，注意起点为 ./",
+			},
+			"content": map[string]interface{}{
+				"type":        "string",
+				"description": "要写入的内容",
+			},
 		},
 		"required": []string{"file_path", "content"},
 	},

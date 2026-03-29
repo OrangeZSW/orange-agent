@@ -13,9 +13,12 @@ var AgentRemoveTool = common.BaseTool{
 	Name:        "agent_remove",
 	Description: "删除指定Agent配置",
 	Parameters: map[string]interface{}{
-		"name": map[string]interface{}{
-			"type":        "string",
-			"description": "Agent名称",
+		"type": "object",
+		"properties": map[string]interface{}{
+			"name": map[string]interface{}{
+				"type":        "string",
+				"description": "Agent名称",
+			},
 		},
 		"required": []string{"name"},
 	},

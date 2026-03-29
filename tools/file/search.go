@@ -14,13 +14,16 @@ var FileSearchTool = common.BaseTool{
 	Name:        "file_search",
 	Description: "在项目中搜索包含特定内容的文件",
 	Parameters: map[string]interface{}{
-		"pattern": map[string]interface{}{
-			"type":        "string",
-			"description": "要搜索的内容或文件名模式",
-		},
-		"directory": map[string]interface{}{
-			"type":        "string",
-			"description": "搜索的目录（可选，默认为当前目录）",
+		"type": "object",
+		"properties": map[string]interface{}{
+			"pattern": map[string]interface{}{
+				"type":        "string",
+				"description": "要搜索的内容或文件名模式",
+			},
+			"directory": map[string]interface{}{
+				"type":        "string",
+				"description": "搜索的目录（可选，默认为当前目录）",
+			},
 		},
 		"required": []string{"pattern"},
 	},

@@ -12,13 +12,16 @@ var DependencyCheckTool = common.BaseTool{
 	Name:        "dependency_check",
 	Description: "检查依赖包版本和更新情况",
 	Parameters: map[string]interface{}{
-		"check_outdated": map[string]interface{}{
-			"type":        "boolean",
-			"description": "是否检查过时的依赖",
-		},
-		"check_vulns": map[string]interface{}{
-			"type":        "boolean",
-			"description": "是否检查安全漏洞",
+		"type": "object",
+		"properties": map[string]interface{}{
+			"check_outdated": map[string]interface{}{
+				"type":        "boolean",
+				"description": "是否检查过时的依赖",
+			},
+			"check_vulns": map[string]interface{}{
+				"type":        "boolean",
+				"description": "是否检查安全漏洞",
+			},
 		},
 	},
 	Call: handlerDependencyCheck,

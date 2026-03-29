@@ -12,18 +12,21 @@ var EnvManageTool = common.BaseTool{
 	Name:        "env_manage",
 	Description: "管理环境变量（获取或设置）",
 	Parameters: map[string]interface{}{
-		"action": map[string]interface{}{
-			"type":        "string",
-			"description": "操作类型：get（获取）、set（设置）、list（列出所有）",
-			"enum":        []interface{}{"get", "set", "list"},
-		},
-		"key": map[string]interface{}{
-			"type":        "string",
-			"description": "环境变量名（当action为get或set时需要）",
-		},
-		"value": map[string]interface{}{
-			"type":        "string",
-			"description": "环境变量值（当action为set时需要）",
+		"type": "object",
+		"properties": map[string]interface{}{
+			"action": map[string]interface{}{
+				"type":        "string",
+				"description": "操作类型：get（获取）、set（设置）、list（列出所有）",
+				"enum":        []interface{}{"get", "set", "list"},
+			},
+			"key": map[string]interface{}{
+				"type":        "string",
+				"description": "环境变量名（当action为get或set时需要）",
+			},
+			"value": map[string]interface{}{
+				"type":        "string",
+				"description": "环境变量值（当action为set时需要）",
+			},
 		},
 		"required": []string{"action"},
 	},
