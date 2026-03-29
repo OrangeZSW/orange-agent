@@ -50,3 +50,7 @@ type CallRecordSaver interface {
 type Chain interface {
 	Process(ctx context.Context, user *domain.User, question string, prompt string) (string, error)
 }
+
+type MessageSender interface {
+	SendMessage(telegramId int64, text string) error
+}

@@ -6,6 +6,7 @@ import (
 
 	"orange-agent/domain"
 	"orange-agent/langchain/chain"
+	"orange-agent/langchain/interfaces"
 	"orange-agent/utils/logger"
 )
 
@@ -19,6 +20,10 @@ func NewAnswerHandler() *AnswerHandler {
 		chain: chain.NewChain(),
 		log:   logger.GetLogger(),
 	}
+}
+
+func (h *AnswerHandler) SetMessageSender(sender interfaces.MessageSender) {
+	h.chain.SetMessageSender(sender)
 }
 
 func (h *AnswerHandler) AnswerQuestion(user *domain.User, memory *domain.Memory, prompt string) string {

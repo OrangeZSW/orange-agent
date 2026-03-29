@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"orange-agent/domain"
+	"orange-agent/langchain/interfaces"
 	"orange-agent/langchain/llm"
 	"orange-agent/langchain/message"
 	"orange-agent/tools"
@@ -18,6 +19,7 @@ type Manager struct {
 	messageCleaner *message.Cleaner
 	log            *logger.Logger
 	user           *domain.User
+	messageSender  interfaces.MessageSender
 }
 
 func NewManager(executor *Executor, cleaner *message.Cleaner) *Manager {
@@ -28,6 +30,10 @@ func NewManager(executor *Executor, cleaner *message.Cleaner) *Manager {
 	}
 }
 
+func (m *Manager) SetMessageSender(sender interfaces.MessageSender) {
+	m.messageSender = sender
+}
+
 func (m *Manager) HandleToolCalls(ctx context.Context, messages []llms.MessageContent,
 	response *llms.ContentResponse, llmProvider *llm.OpenAIProvider) (*llms.ContentResponse, error) {
 
@@ -35,6 +41,8 @@ func (m *Manager) HandleToolCalls(ctx context.Context, messages []llms.MessageCo
 	if choice == nil || len(choice.ToolCalls) == 0 {
 		return response, nil
 	}
+
+	m.sendTelegramMessage(response)
 
 	updatedMessages, err := m.buildToolMessages(ctx, choice.ToolCalls, messages)
 	if err != nil {
@@ -122,9 +130,30 @@ func (m *Manager) SetUser(user *domain.User) {
 	m.user = user
 }
 
+func (m *Manager) sendTelegramMessage(response *llms.ContentResponse) {
+	if m.user == nil {
+		m.log.Warn("用户信息为空，无法发送 Telegram 消息")
+		return
+	}
+
+	if m.messageSender == nil {
+		m.log.Warn("消息发送器为空，无法发送 Telegram 消息")
+		return
+	}
+
+	msg := m.buildTelegramMessage(response)
+	if msg == "" {
+		return
+	}
+
+	telegramId := int64(m.user.TelegramId)
+	if err := m.messageSender.SendMessage(telegramId, msg); err != nil {
+		m.log.Error("发送 Telegram 消息失败: %v", err)
+	}
+}
+
 func (m *Manager) buildTelegramMessage(response *llms.ContentResponse) string {
 	msg := ""
-	//1.ai回复
 	if response.Choices[0].Content != "" {
 		msg = response.Choices[0].Content
 	}

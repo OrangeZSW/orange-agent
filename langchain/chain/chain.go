@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"orange-agent/domain"
+	"orange-agent/langchain/interfaces"
 	"orange-agent/langchain/llm"
 	"orange-agent/langchain/memory"
 	"orange-agent/langchain/message"
@@ -37,6 +38,10 @@ func NewChain() *Chain {
 		toolManager:    toolManager,
 		log:            logger.GetLogger(),
 	}
+}
+
+func (c *Chain) SetMessageSender(sender interfaces.MessageSender) {
+	c.toolManager.SetMessageSender(sender)
 }
 
 func (c *Chain) Process(ctx context.Context, user *domain.User, memoryID uint, question string, prompt string) (string, error) {

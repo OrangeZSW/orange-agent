@@ -12,6 +12,14 @@ import (
 	tele "gopkg.in/telebot.v3"
 )
 
+type TelegramMessageSender struct {
+	bot *TelegramBot
+}
+
+func (s *TelegramMessageSender) SendMessage(telegramId int64, text string) error {
+	return SendMessage(telegramId, text)
+}
+
 type HandlerText struct {
 	telegram *TelegramBot
 	log      logger.Logger
@@ -21,10 +29,14 @@ type HandlerText struct {
 }
 
 func NewHandlerText(bot *TelegramBot) *HandlerText {
+	answerHandler := handler.NewAnswerHandler()
+	messageSender := &TelegramMessageSender{bot: bot}
+	answerHandler.SetMessageSender(messageSender)
+
 	res := &HandlerText{
 		telegram: bot,
 		log:      *logger.GetLogger(),
-		answer:   handler.NewAnswerHandler(),
+		answer:   answerHandler,
 		chain:    chain.NewChain(),
 		repo:     factory.NewFactory(),
 	}
