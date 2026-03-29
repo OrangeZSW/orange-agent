@@ -19,6 +19,21 @@ func NewAgentCallRecordRepository(db *gorm.DB) repository.AgentCallRecordReposit
 	}
 }
 
+func (r *agentCallRecordRepository) SelectByMemoryId(memoryId uint) ([]domain.CallRecord, error) {
+	var records []domain.CallRecord
+
+	// 使用指针传递切片，Find 会自动填充
+	err := r.db.Where("memory_id = ?", memoryId).
+		Order("created_at DESC"). // 按时间倒序
+		Find(&records).Error
+
+	// 如果没有找到记录，返回空切片而不是 nil
+	if err != nil {
+		return []domain.CallRecord{}, err
+	}
+	return records, nil
+}
+
 // CreateAgentCallRecord 创建调用记录
 func (r *agentCallRecordRepository) CreateAgentCallRecord(record *domain.CallRecord) error {
 	if record == nil {

@@ -34,4 +34,5 @@ type AgentConfigRepository interface {
 type AgentCallRecordRepository interface {
 	CreateAgentCallRecord(agentCallRecord *domain.CallRecord) error
 	GetAgentCallRecordByAgentName(agentName string) ([]domain.CallRecord, error)
+	SelectByMemoryId(memoryId uint) ([]domain.CallRecord, error)
 }

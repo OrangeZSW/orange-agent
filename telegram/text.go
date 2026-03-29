@@ -6,25 +6,26 @@ import (
 	repo_factory "orange-agent/repository/factory"
 	"orange-agent/utils"
 	"orange-agent/utils/logger"
+	"strconv"
 
 	tele "gopkg.in/telebot.v3"
 )
 
 type HandlerText struct {
-	telegram    *TelegramBot
-	log         logger.Logger
-	answer      *langchain.AnswerHandler
-	lanchain    *langchain.Lnachain
-	repoFactory *repo_factory.Factory
+	telegram *TelegramBot
+	log      logger.Logger
+	answer   *langchain.AnswerHandler
+	lanchain *langchain.Lnachain
+	repo     *repo_factory.Factory
 }
 
 func NewHandlerText(bot *TelegramBot) *HandlerText {
 	res := &HandlerText{
-		telegram:    bot,
-		log:         *logger.GetLogger(),
-		answer:      langchain.NewAnswerHandler(),
-		lanchain:    langchain.NewLnachain(),
-		repoFactory: repo_factory.NewFactory(),
+		telegram: bot,
+		log:      *logger.GetLogger(),
+		answer:   langchain.NewAnswerHandler(),
+		lanchain: langchain.NewLnachain(),
+		repo:     repo_factory.NewFactory(),
 	}
 	res.RegisterHandler()
 	return res
@@ -42,17 +43,28 @@ func (h *HandlerText) OnText(c tele.Context) error {
 		UserId:       user.ID,
 		UserQuestion: c.Text(),
 	}
-	h.repoFactory.MemoryRepo.CreateMemory(memory)
+	h.repo.MemoryRepo.CreateMemory(memory)
 	h.log.Info("收到用户 %d 输入: %s", telegramId, c.Text())
 	res := h.answer.AnswerQuestion(user, memory, h.telegram.Config.Promete)
 	h.log.Info("模型:%s 响应: %s", user.ModelName, res)
 	memory.AgentAnswer = res
-	h.repoFactory.MemoryRepo.UpdateMemory(memory)
-	return c.Reply(res)
+	h.repo.MemoryRepo.UpdateMemory(memory)
+
+	callRecord, err := h.repo.AgentCallRecordRepo.SelectByMemoryId(memory.ID)
+	if err != nil {
+		h.log.Error("获取调用记录失败: %v", err)
+	}
+	totalTokens := 0
+	for _, record := range callRecord {
+		totalTokens += record.TotalTokens
+	}
+
+	res = res + "\n\n使用toknen" + strconv.Itoa(totalTokens)
+	return c.Reply(res, tele.ModeMarkdownV2)
 }
 
 func (h *HandlerText) GetUser(telegramId uint, username string) *domain.User {
-	user, err := h.repoFactory.UserRepo.GetUserByTelegramId(int64(telegramId))
+	user, err := h.repo.UserRepo.GetUserByTelegramId(int64(telegramId))
 	if err != nil {
 		h.log.Error("获取用户失败: %v", err)
 		return nil
@@ -64,7 +76,7 @@ func (h *HandlerText) GetUser(telegramId uint, username string) *domain.User {
 			Name:       username,
 			ModelName:  h.lanchain.GetDefaultModelName(),
 		}
-		h.repoFactory.UserRepo.CreateUser(user)
+		h.repo.UserRepo.CreateUser(user)
 		return user
 	}
 	return user
