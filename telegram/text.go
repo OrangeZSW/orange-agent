@@ -2,7 +2,8 @@ package telegram
 
 import (
 	"orange-agent/domain"
-	"orange-agent/langchain"
+	"orange-agent/langchain/chain"
+	"orange-agent/langchain/handler"
 	repo_factory "orange-agent/repository/factory"
 	"orange-agent/utils"
 	"orange-agent/utils/logger"
@@ -14,8 +15,8 @@ import (
 type HandlerText struct {
 	telegram *TelegramBot
 	log      logger.Logger
-	answer   *langchain.AnswerHandler
-	lanchain *langchain.Lnachain
+	answer   *handler.AnswerHandler
+	chain    *chain.Chain
 	repo     *repo_factory.Factory
 }
 
@@ -23,8 +24,8 @@ func NewHandlerText(bot *TelegramBot) *HandlerText {
 	res := &HandlerText{
 		telegram: bot,
 		log:      *logger.GetLogger(),
-		answer:   langchain.NewAnswerHandler(),
-		lanchain: langchain.NewLnachain(),
+		answer:   handler.NewAnswerHandler(),
+		chain:    chain.NewChain(),
 		repo:     repo_factory.NewFactory(),
 	}
 	res.RegisterHandler()
@@ -74,10 +75,17 @@ func (h *HandlerText) GetUser(telegramId uint, username string) *domain.User {
 		user = &domain.User{
 			TelegramId: telegramId,
 			Name:       username,
-			ModelName:  h.lanchain.GetDefaultModelName(),
+			ModelName:  h.chain.GetDefaultModelName(),
 		}
 		h.repo.UserRepo.CreateUser(user)
 		return user
 	}
 	return user
+}
+
+func SendTextMessage(bot *TelegramBot, chatId int64, text string) {
+	_, err := bot.Bot.Send(tele.ChatID(chatId), text, tele.ModeHTML)
+	if err != nil {
+		bot.log.Error("发送消息失败: %v", err)
+	}
 }
