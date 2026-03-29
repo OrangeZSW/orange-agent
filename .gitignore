@@ -1,3 +1,4 @@
 config.yaml
 log/
 orange-agent
+.DS_Store

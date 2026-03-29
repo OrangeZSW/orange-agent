@@ -11,8 +11,6 @@ import (
 	"orange-agent/langchain/tool"
 	"orange-agent/tools"
 	"orange-agent/utils/logger"
-
-	"github.com/tmc/langchaingo/llms"
 )
 
 type Chain struct {
@@ -41,19 +39,21 @@ func NewChain() *Chain {
 	}
 }
 
-func (c *Chain) Process(ctx context.Context, user *domain.User, question string, prompt string) (string, error) {
-	llm, err := c.llmProvider.GetLLM(user.ModelName)
+func (c *Chain) Process(ctx context.Context, user *domain.User, memoryID uint, question string, prompt string) (string, error) {
+	_, err := c.llmProvider.GetLLM(user.ModelName)
 	if err != nil {
 		c.log.Error("获取 LLM 失败: %v", err)
 		return "", fmt.Errorf("获取 LLM 失败: %w", err)
 	}
+
+	c.llmProvider.SetContext(user, memoryID)
 
 	c.log.Info("准备调用模型[%s][%s]", c.llmProvider.GetCurrentConfig().Name, user.ModelName)
 
 	messages := c.messageBuilder.BuildMessages(user, question, prompt)
 
 	toolList := tools.GetEllTools()
-	response, err := llm.GenerateContent(ctx, messages, llms.WithTools(toolList))
+	response, err := c.llmProvider.Call(ctx, messages, toolList)
 	if err != nil {
 		c.log.Error("调用语言模型失败: %v", err)
 		return "", fmt.Errorf("调用语言模型失败: %w", err)

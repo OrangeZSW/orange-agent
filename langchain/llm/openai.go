@@ -6,6 +6,7 @@ import (
 
 	"orange-agent/domain"
 	"orange-agent/repository/factory"
+	"orange-agent/utils"
 	"orange-agent/utils/logger"
 
 	"github.com/tmc/langchaingo/llms"
@@ -17,6 +18,8 @@ type OpenAIProvider struct {
 	log         *logger.Logger
 	agentConfig *domain.AgentConfig
 	llm         *openai.LLM
+	user        *domain.User
+	memoryID    uint
 }
 
 func NewOpenAIProvider() *OpenAIProvider {
@@ -24,6 +27,11 @@ func NewOpenAIProvider() *OpenAIProvider {
 		repoFactory: *factory.NewFactory(),
 		log:         logger.GetLogger(),
 	}
+}
+
+func (p *OpenAIProvider) SetContext(user *domain.User, memoryID uint) {
+	p.user = user
+	p.memoryID = memoryID
 }
 
 func (p *OpenAIProvider) GetLLM(model string) (*openai.LLM, error) {
@@ -73,7 +81,38 @@ func (p *OpenAIProvider) Call(ctx context.Context, messages []llms.MessageConten
 		return nil, fmt.Errorf("调用 LLM 失败: %w", err)
 	}
 
+	if p.user != nil && p.memoryID > 0 && response != nil {
+		if err := p.saveCallRecord(response); err != nil {
+			p.log.Error("保存调用记录失败: %v", err)
+		}
+	}
+
 	return response, nil
+}
+
+func (p *OpenAIProvider) saveCallRecord(response *llms.ContentResponse) error {
+	if len(response.Choices) == 0 || response.Choices[0] == nil {
+		p.log.Warn("无法保存空响应的调用记录")
+		return nil
+	}
+
+	generationInfo := response.Choices[0].GenerationInfo
+	callRecord := &domain.CallRecord{
+		ModelName:        p.user.ModelName,
+		AgentId:          p.agentConfig.ID,
+		UserID:           p.user.ID,
+		CompletionTokens: utils.GetIntFromMap(generationInfo, "CompletionTokens"),
+		PromptTokens:     utils.GetIntFromMap(generationInfo, "PromptTokens"),
+		TotalTokens:      utils.GetIntFromMap(generationInfo, "TotalTokens"),
+		MemoryId:         p.memoryID,
+	}
+
+	if err := p.repoFactory.AgentCallRecordRepo.CreateAgentCallRecord(callRecord); err != nil {
+		return err
+	}
+
+	p.log.Info("调用记录已保存，tokens: %d", callRecord.TotalTokens)
+	return nil
 }
 
 func (p *OpenAIProvider) GetCurrentConfig() *domain.AgentConfig {
