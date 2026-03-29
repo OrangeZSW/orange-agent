@@ -17,7 +17,7 @@ type CallRecord struct {
 	gorm.Model
 	UserID           uint         `json:"user_id"`
 	AgentId          uint         `json:"agent_id"`
-	AgentName        string       `json:"agent_name"`
+	ModelName        string       `json:"model_name"`
 	CompletionTokens int          `json:"completion_tokens"`
 	PromptTokens     int          `json:"prompt_tokens"`
 	TotalTokens      int          `json:"total_tokens"`

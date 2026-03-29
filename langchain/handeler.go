@@ -89,7 +89,7 @@ func (h *AnswerHandler) saveCallRecord(user *domain.User, response *llms.Content
 
 	generationInfo := response.Choices[0].GenerationInfo
 	callRecord := &domain.CallRecord{
-		AgentName:        user.ModelName,
+		ModelName:        user.ModelName,
 		AgentId:          h.langChain.agentConfig.ID,
 		UserID:           user.ID,
 		CompletionTokens: utils.GetIntFromMap(generationInfo, "CompletionTokens"),
