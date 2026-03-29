@@ -16,7 +16,7 @@ type MemoryRepository interface {
 	CreateMemory(memory *domain.Memory) error
 	GetMemoryByUserId(userId uint) ([]domain.Memory, error)
 	UpdateMemory(memory *domain.Memory) error
-	GetMemoryByIdAndSize(memoryId uint, size int) ([]domain.Memory, error)
+	GetMemoryByUserIdAndLimit(userId uint, limit int) ([]domain.Memory, error)
 }
 
 // AgentConfigRepository Agent配置仓储接口

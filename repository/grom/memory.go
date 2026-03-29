@@ -49,17 +49,17 @@ func (r *memoryRepository) UpdateMemory(memory *domain.Memory) error {
 	return r.db.Save(memory).Error
 }
 
-// GetMemoryByIdAndSize 根据记忆 ID 和大小获取记忆
-func (r *memoryRepository) GetMemoryByIdAndSize(memoryId uint, size int) ([]domain.Memory, error) {
-	if memoryId == 0 {
-		return []domain.Memory{}, errors.New("memoryId cannot be zero")
+// GetMemoryByUserIdAndLimit 根据用户 ID 和限制获取记忆
+func (r *memoryRepository) GetMemoryByUserIdAndLimit(userId uint, limit int) ([]domain.Memory, error) {
+	if userId == 0 {
+		return []domain.Memory{}, errors.New("userId cannot be zero")
 	}
-	if size <= 0 {
-		return []domain.Memory{}, errors.New("size must be positive")
+	if limit <= 0 {
+		return []domain.Memory{}, errors.New("limit must be positive")
 	}
 
 	var memories []domain.Memory
-	err := r.db.Where("id = ?", memoryId).Limit(size).Find(&memories).Error
+	err := r.db.Where("user_id = ?", userId).Order("created_at DESC").Limit(limit).Find(&memories).Error
 	if err != nil {
 		return []domain.Memory{}, err
 	}
