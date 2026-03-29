@@ -59,8 +59,8 @@ func (h *HandlerText) OnText(c tele.Context) error {
 		totalTokens += record.TotalTokens
 	}
 
-	res = res + "\n\n使用toknen" + strconv.Itoa(totalTokens)
-	return c.Reply(res, tele.ModeMarkdownV2)
+	res = res + "\n\n使用toknen数：" + strconv.Itoa(totalTokens)
+	return c.Reply(res, tele.ModeHTML)
 }
 
 func (h *HandlerText) GetUser(telegramId uint, username string) *domain.User {

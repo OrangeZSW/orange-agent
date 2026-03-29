@@ -17,7 +17,7 @@ import (
 type AnswerHandler struct {
 	langChain *Lnachain
 	logger    *logger.Logger
-	menmory   *domain.Memory
+	memory    *domain.Memory
 	repo      *repo_factory.Factory
 }
 
@@ -44,7 +44,7 @@ func (h *AnswerHandler) CallLLM(ctx context.Context, messages []llms.MessageCont
 
 // AnswerQuestion 处理用户问题并返回答案
 func (h *AnswerHandler) AnswerQuestion(user *domain.User, memory *domain.Memory, prompt string) string {
-	h.menmory = memory
+	h.memory = memory
 	ctx := context.Background()
 	llm := h.langChain.GetLLM(user.ModelName)
 	messages := h.buildMessages(user, memory.UserQuestion, prompt)
@@ -95,7 +95,7 @@ func (h *AnswerHandler) saveCallRecord(user *domain.User, response *llms.Content
 		CompletionTokens: utils.GetIntFromMap(generationInfo, "CompletionTokens"),
 		PromptTokens:     utils.GetIntFromMap(generationInfo, "PromptTokens"),
 		TotalTokens:      utils.GetIntFromMap(generationInfo, "TotalTokens"),
-		MenmoryId:        h.menmory.ID,
+		MemoryId:         h.memory.ID,
 	}
 
 	if err := h.repo.AgentCallRecordRepo.CreateAgentCallRecord(callRecord); err != nil {

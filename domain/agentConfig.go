@@ -23,6 +23,6 @@ type CallRecord struct {
 	TotalTokens      int          `json:"total_tokens"`
 	AgentConfig      *AgentConfig `gorm:"foreignKey:AgentId"`
 	User             *User        `gorm:"foreignKey:UserID"`
-	MenmoryId        uint         `json:"menmory_id"`
-	Memory           *Memory      `gorm:"foreignKey:MenmoryId"`
+	MemoryId         uint         `json:"memory_id"`
+	Memory           *Memory      `gorm:"foreignKey:MemoryId"`
 }
