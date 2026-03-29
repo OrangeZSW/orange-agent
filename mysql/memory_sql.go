@@ -35,3 +35,13 @@ func (m *MemorySql) GetMemoryByUserId(userId uint) (*[]domain.Memory, error) {
 func (m *MemorySql) UpdateMemory(memory *domain.Memory) error {
 	return m.db.Save(memory).Error
 }
+
+// getMemoryByIdAndSize
+func (m *MemorySql) GetMemoryByIdAndSize(memoryId uint, size int) (*[]domain.Memory, error) {
+	var memories []domain.Memory
+	err := m.db.Where("id = ?", memoryId).Limit(size).Find(&memories).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	return &memories, err
+}

@@ -91,7 +91,7 @@ func NewTelegramBotWithProxy(config *config.Telegram) *tele.Bot {
 }
 
 // SendMessage 主动给指定用户发送消息
-func SendMessage(chatID int64, text string) error {
+func (tb *TelegramBot) SendMessage(chatID int64, text string) error {
 	// telebot.v3 的 Send 方法需要 Recipient 和要发送的内容
 	recipient := &tele.User{ID: chatID}
 
