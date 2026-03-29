@@ -9,6 +9,7 @@ type UserRepository interface {
 	CreateUser(user *domain.User) error
 	GetUserByTelegramId(telegramId int64) (*domain.User, error)
 	UpdateUserModelName(telegramId int64, modelName string) error
+	GetUserById(id uint) (*domain.User, error)
 }
 
 // MemoryRepository 记忆仓储接口

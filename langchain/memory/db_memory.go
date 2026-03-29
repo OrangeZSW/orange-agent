@@ -2,18 +2,18 @@ package memory
 
 import (
 	"orange-agent/domain"
-	repo_factory "orange-agent/repository/factory"
+	factory "orange-agent/repository/factory"
 	"orange-agent/utils/logger"
 )
 
 type DBMemoryManager struct {
-	repo repo_factory.Factory
+	repo factory.Factory
 	log  *logger.Logger
 }
 
 func NewDBMemoryManager() *DBMemoryManager {
 	return &DBMemoryManager{
-		repo: *repo_factory.NewFactory(),
+		repo: *factory.NewFactory(),
 		log:  logger.GetLogger(),
 	}
 }

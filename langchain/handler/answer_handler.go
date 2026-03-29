@@ -6,7 +6,7 @@ import (
 
 	"orange-agent/domain"
 	"orange-agent/langchain/chain"
-	repo_factory "orange-agent/repository/factory"
+	"orange-agent/repository/factory"
 	"orange-agent/utils"
 	"orange-agent/utils/logger"
 
@@ -15,7 +15,7 @@ import (
 
 type AnswerHandler struct {
 	chain      *chain.Chain
-	repo       *repo_factory.Factory
+	repo       *factory.Factory
 	log        *logger.Logger
 	currentMem *domain.Memory
 }
@@ -23,7 +23,7 @@ type AnswerHandler struct {
 func NewAnswerHandler() *AnswerHandler {
 	return &AnswerHandler{
 		chain: chain.NewChain(),
-		repo:  repo_factory.NewFactory(),
+		repo:  factory.NewFactory(),
 		log:   logger.GetLogger(),
 	}
 }

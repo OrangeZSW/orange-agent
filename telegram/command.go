@@ -2,7 +2,7 @@ package telegram
 
 import (
 	"orange-agent/domain"
-	repo_factory "orange-agent/repository/factory"
+	factory "orange-agent/repository/factory"
 	"orange-agent/utils"
 	"strings"
 
@@ -10,14 +10,14 @@ import (
 )
 
 type HandlerCommand struct {
-	repoFactory *repo_factory.Factory
+	repoFactory *factory.Factory
 	TelegramBot *TelegramBot
 }
 
 func NewHandlerCommand(bot *TelegramBot) *HandlerCommand {
 	res := &HandlerCommand{
 		TelegramBot: bot,
-		repoFactory: repo_factory.NewFactory(),
+		repoFactory: factory.NewFactory(),
 	}
 	res.RegisterHandler()
 	return res

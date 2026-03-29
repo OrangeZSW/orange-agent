@@ -6,9 +6,15 @@ import (
 	"net/url"
 	"orange-agent/config"
 	"orange-agent/utils/logger"
+	"sync"
 	"time"
 
 	tele "gopkg.in/telebot.v3"
+)
+
+var (
+	telegramBot *TelegramBot
+	once        sync.Once
 )
 
 type TelegramBot struct {
@@ -20,15 +26,18 @@ type TelegramBot struct {
 }
 
 func NewTelegramBot(config *config.Telegram) *TelegramBot {
-	b := NewTelegramBotWithProxy(config)
-	telegram := &TelegramBot{
-		Config: config,
-		log:    logger.GetLogger(),
-		Bot:    b,
-	}
-	telegram.handlerCommand = NewHandlerCommand(telegram)
-	telegram.HandlerText = NewHandlerText(telegram)
-	return telegram
+	once.Do(func() {
+		b := NewTelegramBotWithProxy(config)
+		telegram := &TelegramBot{
+			Config: config,
+			log:    logger.GetLogger(),
+			Bot:    b,
+		}
+		telegram.handlerCommand = NewHandlerCommand(telegram)
+		telegram.HandlerText = NewHandlerText(telegram)
+		telegramBot = telegram
+	})
+	return telegramBot
 }
 
 func (tb *TelegramBot) registerHandlers() {
@@ -90,18 +99,6 @@ func NewTelegramBotWithProxy(config *config.Telegram) *tele.Bot {
 	return b
 }
 
-// SendMessage 主动给指定用户发送消息
-func (tb *TelegramBot) SendMessage(chatID int64, text string) error {
-	// telebot.v3 的 Send 方法需要 Recipient 和要发送的内容
-	recipient := &tele.User{ID: chatID}
-
-	// 发送消息
-	_, err := tb.Bot.Send(recipient, text)
-	if err != nil {
-		tb.log.Error("主动发送消息失败, chatID: %d, error: %v", chatID, err)
-		return err
-	}
-
-	tb.log.Info("主动发送消息成功, chatID: %d", chatID)
-	return nil
+func GetTelegramBot() *TelegramBot {
+	return telegramBot
 }

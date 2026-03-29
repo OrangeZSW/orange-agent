@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"orange-agent/domain"
-	repo_factory "orange-agent/repository/factory"
+	"orange-agent/repository/factory"
 	"orange-agent/utils/logger"
 
 	"github.com/tmc/langchaingo/llms"
@@ -13,7 +13,7 @@ import (
 )
 
 type OpenAIProvider struct {
-	repoFactory repo_factory.Factory
+	repoFactory factory.Factory
 	log         *logger.Logger
 	agentConfig *domain.AgentConfig
 	llm         *openai.LLM
@@ -21,7 +21,7 @@ type OpenAIProvider struct {
 
 func NewOpenAIProvider() *OpenAIProvider {
 	return &OpenAIProvider{
-		repoFactory: *repo_factory.NewFactory(),
+		repoFactory: *factory.NewFactory(),
 		log:         logger.GetLogger(),
 	}
 }

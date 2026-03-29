@@ -1,4 +1,4 @@
-package repo_factory
+package factory
 
 import (
 	"orange-agent/repository"

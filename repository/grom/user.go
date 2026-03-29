@@ -19,6 +19,23 @@ func NewUserRepository(db *gorm.DB) repository.UserRepository {
 	}
 }
 
+// GetUserById 根据 ID 获取用户
+func (r *userRepository) GetUserById(id uint) (*domain.User, error) {
+	if id == 0 {
+		return nil, errors.New("id cannot be zero")
+	}
+
+	var user domain.User
+	err := r.db.Where("id = ?", id).First(&user).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &user, nil
+}
+
 // CreateUser 创建用户
 func (r *userRepository) CreateUser(user *domain.User) error {
 	if user == nil {
