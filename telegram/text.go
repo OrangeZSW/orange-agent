@@ -2,7 +2,7 @@ package telegram
 
 import (
 	"orange-agent/domain"
-	langchain "orange-agent/lanchain"
+	"orange-agent/langchain"
 	repo_factory "orange-agent/repository/factory"
 	"orange-agent/utils"
 	"orange-agent/utils/logger"
