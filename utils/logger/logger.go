@@ -147,8 +147,12 @@ func (l *Logger) log(level LogLevel, format string, args ...interface{}) {
 		return
 	}
 
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	//判断日志是否需要轮转
+	if time.Now().Format("2006-01-02") != l.GetLastModifiedTime() {
+		if err := l.Rotate(); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to rotate log file: %v\n", err)
+		}
+	}
 
 	now := time.Now().Format("2006-01-02 15:04:05.000")
 	levelStr := levelStrings[level]
@@ -262,21 +266,42 @@ func (l *Logger) Rotate() error {
 		return err
 	}
 
-	// 重新打开文件
-	filePath := l.file.Name()
-	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	// 重命名旧文件 app-2024-06-01.log
+	oldPath := l.file.Name()
+	newPath := fmt.Sprintf("%s-%s.log", strings.TrimSuffix(oldPath, ".log"), time.Now().Format("2006-01-02"))
+	if err := os.Rename(oldPath, newPath); err != nil {
+		return err
+	}
+
+	// 创建新文件
+	if err := os.MkdirAll(filepath.Dir(oldPath), 0755); err != nil {
+		return err
+	}
+
+	// 打开新文件
+	file, err := os.OpenFile(oldPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return err
 	}
 
 	l.file = file
 
-	if l.output == l.file {
-		l.output = file
-	} else {
-		writers := []io.Writer{os.Stdout, file}
-		l.output = io.MultiWriter(writers...)
+	return nil
+}
+
+// 获取当前日志文件的最后修改时间
+func (l *Logger) GetLastModifiedTime() string {
+	if l.file == nil {
+		return ""
 	}
 
-	return nil
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	fileInfo, err := l.file.Stat()
+	if err != nil {
+		return ""
+	}
+
+	return fileInfo.ModTime().Format("2006-01-02")
 }

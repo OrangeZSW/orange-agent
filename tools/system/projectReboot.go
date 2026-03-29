@@ -18,7 +18,7 @@ func handlerProjectReboot(ctx context.Context, input string) (string, error) {
 
 	// 使用异步重启，让当前进程先退出
 	go func() {
-		time.Sleep(1 * time.Second) // 等待当前响应返回
+		time.Sleep(2 * time.Second) // 等待当前响应返回
 		cmd := exec.Command("./start.sh")
 		cmd.Start() // 使用 Start 而不是 Run，不等待完成
 	}()

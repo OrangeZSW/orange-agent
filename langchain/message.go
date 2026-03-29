@@ -93,7 +93,7 @@ func (h *AnswerHandler) buildToolMessages(ctx context.Context, toolCalls []llms.
 	updatedMessages = append(updatedMessages, toolMessages...)
 
 	// 基于 token 数量清理（使用配置的 maxTokens）
-	cleanedMessages, err := h.cleanMessagesByToken(updatedMessages, 4000)
+	cleanedMessages, err := h.cleanMessagesByToken(updatedMessages, 8000)
 	if err != nil {
 		h.logger.Error("清理消息失败: %v", err)
 		// 降级：基于数量清理，保留最新的20条消息
@@ -103,25 +103,23 @@ func (h *AnswerHandler) buildToolMessages(ctx context.Context, toolCalls []llms.
 	return cleanedMessages, nil
 }
 
-// cleanMessagesByToken 基于 token 数量清理消息
+// cleanMessagesByToken 基于 token 数量清理消息 (修复版：确保成对删除)
 func (h *AnswerHandler) cleanMessagesByToken(
 	messages []llms.MessageContent,
 	maxTokens int,
 ) ([]llms.MessageContent, error) {
 
-	// 如果没有消息，直接返回
 	if len(messages) == 0 {
 		return messages, nil
 	}
 
-	// 计算总 token 数
+	// 1. 计算每条消息的 token 数
 	totalTokens := 0
 	tokenCounts := make([]int, len(messages))
-
 	for i, msg := range messages {
 		msgTokens, err := h.calculateTokens(msg)
 		if err != nil {
-			return nil, fmt.Errorf("计算消息 %d 的 token 数失败: %w", i, err)
+			return nil, fmt.Errorf("计算消息 %d 的 token 数失败：%w", i, err)
 		}
 		tokenCounts[i] = msgTokens
 		totalTokens += msgTokens
@@ -132,30 +130,61 @@ func (h *AnswerHandler) cleanMessagesByToken(
 		return messages, nil
 	}
 
-	// 找出所有工具消息的索引（从旧到新）
-	var toolMsgIndices []int
-	for i, msg := range messages {
-		if msg.Role == llms.ChatMessageTypeTool {
-			toolMsgIndices = append(toolMsgIndices, i)
-		}
-	}
-
-	// 创建删除标记
+	// 2. 创建删除标记
 	deleteFlags := make([]bool, len(messages))
-
-	// 从最旧的工具消息开始删除，直到 token 数符合要求
 	removedTokens := 0
-	for _, idx := range toolMsgIndices {
+
+	// 3. 策略：从最旧的消息开始扫描，寻找孤立的或需要被清理的 Tool 消息
+	// 我们必须保持 [AI(tool_call), Tool(response)] 的完整性。
+	// 如果我们要删除一个 Tool 消息，必须连同它前面的那个 AI 消息一起删除。
+
+	// 我们从索引 1 开始遍历（因为 Tool 消息前面必须有 AI 消息，索引 0 不可能是待删除的孤立 Tool）
+	for i := 1; i < len(messages); i++ {
 		if totalTokens-removedTokens <= maxTokens {
 			break
 		}
-		deleteFlags[idx] = true
-		removedTokens += tokenCounts[idx]
 
-		h.logger.Debug("删除旧的工具消息，索引: %d, tokens: %d", idx, tokenCounts[idx])
+		currentMsg := messages[i]
+
+		// 只有当前消息是 Tool 消息时，才考虑删除这对消息
+		if currentMsg.Role == llms.ChatMessageTypeTool {
+			prevMsg := messages[i-1]
+
+			// 检查前一条消息是否是包含 tool_calls 的 AI 消息
+			// 注意：有些实现中，AI 消息可能混合了文本和 tool_call，只要角色是 AI 且紧接着是 Tool，通常视为一对
+			if prevMsg.Role == llms.ChatMessageTypeAI {
+				// 确认前一条 AI 消息确实包含工具调用（可选优化，防止误删普通 AI 回复）
+				hasToolCall := false
+				for _, part := range prevMsg.Parts {
+					if _, ok := part.(llms.ToolCall); ok {
+						hasToolCall = true
+						break
+					}
+				}
+
+				if hasToolCall {
+					// === 核心修复：同时标记删除 AI 和 Tool ===
+
+					// 如果前一条还没被标记删除（避免重复计算）
+					if !deleteFlags[i-1] {
+						deleteFlags[i-1] = true
+						removedTokens += tokenCounts[i-1]
+						h.logger.Debug("成对删除：旧的 AI 工具调用消息，索引：%d, tokens: %d", i-1, tokenCounts[i-1])
+					}
+
+					// 标记删除当前的 Tool 消息
+					deleteFlags[i] = true
+					removedTokens += tokenCounts[i]
+					h.logger.Debug("成对删除：旧的工具响应消息，索引：%d, tokens: %d", i, tokenCounts[i])
+
+					// 跳过下一条检查（因为 i+1 可能是新的 User 消息，不需要特殊处理，循环会继续）
+					continue
+				}
+			}
+		}
 	}
 
-	// 构建清理后的消息列表
+	// 4. 构建清理后的消息列表
 	result := make([]llms.MessageContent, 0, len(messages))
 	for i, msg := range messages {
 		if !deleteFlags[i] {
@@ -163,8 +192,9 @@ func (h *AnswerHandler) cleanMessagesByToken(
 		}
 	}
 
-	h.logger.Info("消息清理完成，原始 token 数: %d，清理后 token 数: %d，删除了 %d 条消息",
-		totalTokens, totalTokens-removedTokens, len(toolMsgIndices)-len(result)+len(messages))
+	finalTokens := totalTokens - removedTokens
+	h.logger.Info("消息清理完成，原始:%d -> 清理后:%d, 删除了 %d 条消息 (含成对删除)",
+		totalTokens, finalTokens, len(messages)-len(result))
 
 	return result, nil
 }
