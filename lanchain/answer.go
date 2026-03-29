@@ -212,8 +212,8 @@ func (h *AnswerHandler) buildMessages(user domain.User, question string, prompt 
 		h.logger.Debug("加载用户记忆：%d 条", len(*memories))
 
 		startIdx := 0
-		if len(*memories) > 5 {
-			startIdx = len(*memories) - 5
+		if len(*memories) > 3 {
+			startIdx = len(*memories) - 3
 		}
 		for _, memory := range (*memories)[startIdx:] {
 			messages = append(messages,
