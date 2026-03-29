@@ -45,7 +45,7 @@ func (c *Chain) Process(ctx context.Context, user *domain.User, memoryID uint, q
 		c.log.Error("获取 LLM 失败: %v", err)
 		return "", fmt.Errorf("获取 LLM 失败: %w", err)
 	}
-
+	c.toolManager.SetUser(user)
 	c.llmProvider.SetContext(user, memoryID)
 
 	c.log.Info("准备调用模型[%s][%s]", c.llmProvider.GetCurrentConfig().Name, user.ModelName)

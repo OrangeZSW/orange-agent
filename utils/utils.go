@@ -48,3 +48,8 @@ func StrToMap(s string) (map[string]interface{}, error) {
 	}
 	return m, nil
 }
+
+// unit -> int64
+func UintToInt64(i uint) int64 {
+	return int64(i)
+}

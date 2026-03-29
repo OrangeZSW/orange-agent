@@ -4,7 +4,7 @@ import (
 	"orange-agent/domain"
 	"orange-agent/langchain/chain"
 	"orange-agent/langchain/handler"
-	factory "orange-agent/repository/factory"
+	"orange-agent/repository/factory"
 	"orange-agent/utils"
 	"orange-agent/utils/logger"
 	"strconv"

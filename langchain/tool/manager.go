@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"orange-agent/domain"
 	"orange-agent/langchain/llm"
 	"orange-agent/langchain/message"
 	"orange-agent/tools"
@@ -16,6 +17,7 @@ type Manager struct {
 	executor       *Executor
 	messageCleaner *message.Cleaner
 	log            *logger.Logger
+	user           *domain.User
 }
 
 func NewManager(executor *Executor, cleaner *message.Cleaner) *Manager {
@@ -114,4 +116,24 @@ func (m *Manager) buildToolMessages(ctx context.Context, toolCalls []llms.ToolCa
 	}
 
 	return cleanedMessages, nil
+}
+
+func (m *Manager) SetUser(user *domain.User) {
+	m.user = user
+}
+
+func (m *Manager) buildTelegramMessage(response *llms.ContentResponse) string {
+	msg := ""
+	//1.ai回复
+	if response.Choices[0].Content != "" {
+		msg = response.Choices[0].Content
+	}
+	if len(response.Choices[0].ToolCalls) > 0 {
+		for _, toolCall := range response.Choices[0].ToolCalls {
+			msg += fmt.Sprintf("\n工具调用：%s，参数：%.200s", toolCall.FunctionCall.Name, toolCall.FunctionCall.Arguments)
+			msg += "\n"
+		}
+
+	}
+	return msg
 }
