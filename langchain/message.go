@@ -5,10 +5,28 @@ import (
 	"fmt"
 	"orange-agent/domain"
 
+	"github.com/pkoukk/tiktoken-go"
 	"github.com/tmc/langchaingo/llms"
 )
 
-// / buildToolMessages 构建包含工具调用和响应的消息
+type ToolMessageManager struct {
+	maxTokens int // 最大 token 数
+	tokenizer *tiktoken.Tiktoken
+}
+
+func NewToolMessageManager(maxTokens int) *ToolMessageManager {
+	tkm, err := tiktoken.GetEncoding("cl100k_base") // OpenAI 的编码
+	if err != nil {
+		return nil
+	}
+
+	return &ToolMessageManager{
+		maxTokens: maxTokens,
+		tokenizer: tkm,
+	}
+}
+
+// buildToolMessages 构建包含工具调用和响应的消息
 func (h *AnswerHandler) buildToolMessages(ctx context.Context, toolCalls []llms.ToolCall,
 	messages []llms.MessageContent) ([]llms.MessageContent, error) {
 
@@ -68,13 +86,160 @@ func (h *AnswerHandler) buildToolMessages(ctx context.Context, toolCalls []llms.
 
 	h.logger.Info("工具调用处理完成，共处理 %d 个工具调用", len(toolCalls))
 
-	// 构建新的消息列表
+	// 先构建完整消息列表
 	updatedMessages := make([]llms.MessageContent, 0, len(messages)+1+len(toolMessages))
 	updatedMessages = append(updatedMessages, messages...)
 	updatedMessages = append(updatedMessages, aiMessage)
 	updatedMessages = append(updatedMessages, toolMessages...)
 
-	return updatedMessages, nil
+	// 基于 token 数量清理（使用配置的 maxTokens）
+	cleanedMessages, err := h.cleanMessagesByToken(updatedMessages, 4000)
+	if err != nil {
+		h.logger.Error("清理消息失败: %v", err)
+		// 降级：基于数量清理，保留最新的20条消息
+		return h.cleanMessagesByCount(updatedMessages, 20), nil
+	}
+
+	return cleanedMessages, nil
+}
+
+// cleanMessagesByToken 基于 token 数量清理消息
+func (h *AnswerHandler) cleanMessagesByToken(
+	messages []llms.MessageContent,
+	maxTokens int,
+) ([]llms.MessageContent, error) {
+
+	// 如果没有消息，直接返回
+	if len(messages) == 0 {
+		return messages, nil
+	}
+
+	// 计算总 token 数
+	totalTokens := 0
+	tokenCounts := make([]int, len(messages))
+
+	for i, msg := range messages {
+		msgTokens, err := h.calculateTokens(msg)
+		if err != nil {
+			return nil, fmt.Errorf("计算消息 %d 的 token 数失败: %w", i, err)
+		}
+		tokenCounts[i] = msgTokens
+		totalTokens += msgTokens
+	}
+
+	// 如果未超限，直接返回
+	if totalTokens <= maxTokens {
+		return messages, nil
+	}
+
+	// 找出所有工具消息的索引（从旧到新）
+	var toolMsgIndices []int
+	for i, msg := range messages {
+		if msg.Role == llms.ChatMessageTypeTool {
+			toolMsgIndices = append(toolMsgIndices, i)
+		}
+	}
+
+	// 创建删除标记
+	deleteFlags := make([]bool, len(messages))
+
+	// 从最旧的工具消息开始删除，直到 token 数符合要求
+	removedTokens := 0
+	for _, idx := range toolMsgIndices {
+		if totalTokens-removedTokens <= maxTokens {
+			break
+		}
+		deleteFlags[idx] = true
+		removedTokens += tokenCounts[idx]
+
+		h.logger.Debug("删除旧的工具消息，索引: %d, tokens: %d", idx, tokenCounts[idx])
+	}
+
+	// 构建清理后的消息列表
+	result := make([]llms.MessageContent, 0, len(messages))
+	for i, msg := range messages {
+		if !deleteFlags[i] {
+			result = append(result, msg)
+		}
+	}
+
+	h.logger.Info("消息清理完成，原始 token 数: %d，清理后 token 数: %d，删除了 %d 条消息",
+		totalTokens, totalTokens-removedTokens, len(toolMsgIndices)-len(result)+len(messages))
+
+	return result, nil
+}
+
+// cleanMessagesByCount 基于数量清理消息（降级方案）
+func (h *AnswerHandler) cleanMessagesByCount(
+	messages []llms.MessageContent,
+	maxMessages int,
+) []llms.MessageContent {
+
+	if len(messages) <= maxMessages {
+		return messages
+	}
+
+	// 保留最新的 maxMessages 条消息
+	startIndex := len(messages) - maxMessages
+	result := make([]llms.MessageContent, maxMessages)
+	copy(result, messages[startIndex:])
+
+	h.logger.Warn("使用降级方案：基于数量清理，从 %d 条消息保留最新的 %d 条",
+		len(messages), maxMessages)
+
+	return result
+}
+
+// calculateTokens 计算单条消息的 token 数
+func (h *AnswerHandler) calculateTokens(msg llms.MessageContent) (int, error) {
+	// 如果 tokenizer 未初始化，返回估算值
+	if h.langChain.toolMessageManager.tokenizer == nil {
+		// 降级：粗略估算（1个token约等于4个字符）
+		text := h.messageToText(msg)
+		return len(text) / 4, nil
+	}
+
+	// 将消息转换为文本
+	text := h.messageToText(msg)
+
+	// 使用 tiktoken 计算 token 数
+	tokens := h.langChain.toolMessageManager.tokenizer.Encode(text, nil, nil)
+	return len(tokens), nil
+}
+
+// messageToText 将消息转换为文本
+func (h *AnswerHandler) messageToText(msg llms.MessageContent) string {
+	var text string
+
+	// 添加角色标识
+	switch msg.Role {
+	case llms.ChatMessageTypeSystem:
+		text += "System: "
+	case llms.ChatMessageTypeHuman:
+		text += "Human: "
+	case llms.ChatMessageTypeAI:
+		text += "AI: "
+	case llms.ChatMessageTypeTool:
+		text += "Tool: "
+	}
+
+	// 处理消息内容
+	for _, part := range msg.Parts {
+		switch p := part.(type) {
+		case llms.TextContent:
+			text += p.Text
+		case llms.ToolCall:
+			if p.FunctionCall != nil {
+				text += fmt.Sprintf("ToolCall[name=%s, args=%s] ",
+					p.FunctionCall.Name, p.FunctionCall.Arguments)
+			}
+		case llms.ToolCallResponse:
+			text += fmt.Sprintf("ToolResponse[name=%s, content=%s] ",
+				p.Name, p.Content)
+		}
+	}
+
+	return text
 }
 
 // buildMessages 构建完整的对话消息
@@ -85,14 +250,17 @@ func (h *AnswerHandler) buildMessages(user *domain.User, question string, prompt
 
 	// 添加用户记忆
 	memories, err := h.repo.MemoryRepo.GetMemoryByIdAndSize(user.ID, 3)
-	for _, item := range memories {
-		item.AgentAnswer = ""
-	}
 
 	if err != nil {
 		h.logger.Error("获取用户记忆失败: %v", err)
 	} else {
 		h.logger.Debug("加载用户记忆：%d 条", len(memories))
+		for _, memory := range memories {
+			messages = append(messages, llms.TextParts(llms.ChatMessageTypeHuman, memory.UserQuestion))
+			if memory.AgentAnswer != "" {
+				messages = append(messages, llms.TextParts(llms.ChatMessageTypeAI, memory.AgentAnswer))
+			}
+		}
 	}
 
 	// 添加当前问题

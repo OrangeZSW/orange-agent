@@ -9,15 +9,17 @@ import (
 )
 
 type Lnachain struct {
-	repoFactory repo_factory.Factory
-	log         *logger.Logger
-	agentConfig *domain.AgentConfig
+	repoFactory        repo_factory.Factory
+	log                *logger.Logger
+	agentConfig        *domain.AgentConfig
+	toolMessageManager *ToolMessageManager
 }
 
 func NewLnachain() *Lnachain {
 	return &Lnachain{
-		repoFactory: *repo_factory.NewFactory(),
-		log:         logger.GetLogger(),
+		repoFactory:        *repo_factory.NewFactory(),
+		log:                logger.GetLogger(),
+		toolMessageManager: NewToolMessageManager(2000),
 	}
 }
 func (l *Lnachain) GetLLM(model string) *openai.LLM {
