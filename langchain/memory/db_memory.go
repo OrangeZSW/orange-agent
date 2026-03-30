@@ -25,7 +25,7 @@ func (m *DBMemoryManager) GetMemory(userID uint, limit int) ([]domain.Memory, er
 		return nil, err
 	}
 
-	m.log.Debug("加载用户 %d 记忆：%d 条", userID, len(memories))
+	m.log.Debug("加载用户ID %d 记忆：%d 条", userID, len(memories))
 	return memories, nil
 }
 
