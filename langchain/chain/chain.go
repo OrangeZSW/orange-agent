@@ -20,6 +20,7 @@ type Chain struct {
 	messageBuilder *message.Builder
 	toolManager    *tool.Manager
 	log            *logger.Logger
+	MenangerSender interfaces.MessageSender
 }
 
 func NewChain() *Chain {
@@ -41,6 +42,7 @@ func NewChain() *Chain {
 }
 
 func (c *Chain) SetMessageSender(sender interfaces.MessageSender) {
+	c.MenangerSender = sender
 	c.toolManager.SetMessageSender(sender)
 }
 
