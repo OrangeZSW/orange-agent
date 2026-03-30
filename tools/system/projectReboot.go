@@ -9,9 +9,13 @@ import (
 
 var ProjectRebootTool = common.BaseTool{
 	Name:        "project_reboot",
-	Description: "重启项目 - 重新编译并运行，需要确认才能执行",
-	Parameters:  map[string]interface{}{},
-	Call:        handlerProjectReboot,
+	Description: "重启项目 - 重新编译并运行",
+	Parameters: map[string]interface{}{
+		"type":       "object",
+		"properties": map[string]interface{}{},
+		"required":   []string{},
+	},
+	Call: handlerProjectReboot,
 }
 
 func handlerProjectReboot(ctx context.Context, input string) (string, error) {

@@ -11,8 +11,12 @@ import (
 var AgentListTool = common.BaseTool{
 	Name:        "agent_list",
 	Description: "列出所有已配置的Agent",
-	Parameters:  map[string]interface{}{},
-	Call:        handleAgentList,
+	Parameters: map[string]interface{}{
+		"type":       "object",
+		"properties": map[string]interface{}{},
+		"required":   []interface{}{},
+	},
+	Call: handleAgentList,
 }
 
 func handleAgentList(ctx context.Context, input string) (string, error) {

@@ -11,7 +11,10 @@ var FileListTool = common.BaseTool{
 	Name:        "file_list",
 	Description: "list all files in the current directory",
 	Call:        handlerFileList,
-	Parameters:  map[string]interface{}{},
+	Parameters: map[string]interface{}{
+		"type":       "object",
+		"properties": map[string]interface{}{},
+	},
 }
 
 func handlerFileList(ctx context.Context, input string) (string, error) {

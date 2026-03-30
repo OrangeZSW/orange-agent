@@ -7,7 +7,6 @@ import (
 	"orange-agent/repository/factory"
 	"orange-agent/utils"
 	"orange-agent/utils/logger"
-	"strconv"
 
 	tele "gopkg.in/telebot.v3"
 )
@@ -71,8 +70,7 @@ func (h *HandlerText) OnText(c tele.Context) error {
 	for _, record := range callRecord {
 		totalTokens += record.TotalTokens
 	}
-
-	res = res + "\n\n使用toknen数：" + strconv.Itoa(totalTokens)
+	err = c.Send(res, tele.ModeMarkdown)
 	if err != nil {
 		h.log.Error("发送消息失败: %v", err)
 	}

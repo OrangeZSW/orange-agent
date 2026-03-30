@@ -6,19 +6,18 @@ import (
 	"os/exec"
 )
 
-type BuildTools struct {
-	common.BaseTool
+var BuildTool = common.BaseTool{
+	Name:        "build_tools",
+	Description: "执行构建脚本，编译项目",
+	Parameters: map[string]interface{}{
+		"type":       "object",
+		"properties": map[string]interface{}{},
+		"required":   []string{},
+	},
+	Call: handlerBuild,
 }
 
-func (b *BuildTools) Name() string {
-	return "build_tools"
-}
-
-func (b *BuildTools) Description() string {
-	return "build tools"
-}
-
-func (b *BuildTools) Call(ctx context.Context, input string) (string, error) {
+func handlerBuild(ctx context.Context, input string) (string, error) {
 	cmd := exec.Command("bash", "-c", "chmod +x ./build.sh && ./build.sh")
 	output, err := cmd.CombinedOutput()
 
@@ -29,12 +28,4 @@ func (b *BuildTools) Call(ctx context.Context, input string) (string, error) {
 	}
 	result += "\n\nBuild completed successfully!"
 	return result, nil
-}
-
-func (b *BuildTools) Parameters() interface{} {
-	return map[string]interface{}{
-		"type":       "object",
-		"properties": map[string]interface{}{},
-		"required":   []string{},
-	}
 }

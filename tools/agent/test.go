@@ -8,7 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"orange-agent/common"
-	factory "orange-agent/repository/factory"
+	"orange-agent/repository/factory"
 	"time"
 )
 
@@ -16,11 +16,14 @@ var AgentTestTool = common.BaseTool{
 	Name:        "agent_test",
 	Description: "测试Agent连接状态",
 	Parameters: map[string]interface{}{
-		"name": map[string]interface{}{
-			"type":        "string",
-			"description": "Agent名称",
+		"type": "object",
+		"properties": map[string]interface{}{
+			"name": map[string]interface{}{
+				"type":        "string",
+				"description": "Agent名称",
+			},
 		},
-		"required": []string{"name"},
+		"required": []interface{}{"name"},
 	},
 	Call: handlerAgentTest,
 }
