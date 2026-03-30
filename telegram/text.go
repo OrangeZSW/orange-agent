@@ -71,7 +71,7 @@ func (h *HandlerText) OnText(c tele.Context) error {
 		totalTokens += record.TotalTokens
 	}
 	res = res + "\n\n" + "总共消耗Token: " + utils.IntToString(totalTokens)
-	err = c.Send(res, tele.ModeHTML)
+	err = c.Send(res, tele.ModeMarkdown)
 	if err != nil {
 		h.log.Error("发送消息失败: %v", err)
 	}
