@@ -57,7 +57,7 @@ echo "========== 启动新进程 =========="
 # nohup ./orange-agent > app.log 2>&1 &
 
 # 前台运行
-./orange-agent
+./orange-agent > /dev/null 2>&1 &
 
 # 判断运行是否成功
 if [ $? -eq 0 ]; then
@@ -66,3 +66,4 @@ else
     echo "❌ 运行失败"
     exit 1
 fi
+
