@@ -11,4 +11,5 @@ var FileTools = []common.BaseTool{
 	FileListTool,
 	FileRenameTool,
 	FileSearchTool,
+	RandomReadFile,
 }

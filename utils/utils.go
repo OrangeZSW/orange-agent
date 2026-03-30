@@ -53,3 +53,14 @@ func StrToMap(s string) (map[string]interface{}, error) {
 func UintToInt64(i uint) int64 {
 	return int64(i)
 }
+
+// str -> int64
+func StrToInt64(s string) int64 {
+	i, _ := strconv.ParseInt(s, 10, 64)
+	return i
+}
+
+// int -> str
+func IntToString(i int) string {
+	return strconv.Itoa(i)
+}
