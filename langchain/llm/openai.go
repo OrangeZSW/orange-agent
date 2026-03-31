@@ -142,3 +142,58 @@ func (p *OpenAIProvider) createHTTPClient(proxyURL string) (*http.Client, error)
 		Transport: transport,
 	}, nil
 }
+
+// chst
+
+func (p *OpenAIProvider) Chat(messages []domain.Message) (string, error) {
+	openaiMessages := make([]llms.MessageContent, len(messages))
+	for i, msg := range messages {
+		openaiMessages[i] = llms.MessageContent{
+			Role: llms.ChatMessageType(msg.Role),
+			Parts: []llms.ContentPart{
+				llms.TextPart(msg.Content),
+			},
+		}
+	}
+	res, err := p.Call(context.Background(), openaiMessages, nil)
+	if err != nil {
+		p.log.Error("Chat error: %v", err)
+		return "", err
+	}
+	return res.Choices[0].Content, nil
+}
+
+// ChatWithContext
+func (p *OpenAIProvider) ChatWithContext(ctx context.Context, taskCtx *domain.TaskContext, userMessage string) (string, int, error) {
+	one := []llms.MessageContent{}
+	one = append(one, llms.MessageContent{
+		Role: llms.ChatMessageTypeHuman,
+		Parts: []llms.ContentPart{
+			llms.TextPart(userMessage),
+		},
+	})
+
+	one = append(one, llms.MessageContent{
+		Role: llms.ChatMessageTypeSystem,
+		Parts: []llms.ContentPart{
+			llms.TextPart(taskCtx.SystemPrompt),
+		},
+	})
+
+	for _, item := range taskCtx.Messages {
+		one = append(one, llms.MessageContent{
+			Role: llms.ChatMessageType(item.Role),
+			Parts: []llms.ContentPart{
+				llms.TextPart(item.Content),
+			},
+		})
+	}
+	res, err := p.Call(ctx, one, nil)
+	if err != nil {
+		p.log.Error("ChatWithContext error: %v", err)
+		return "", 0, err
+	}
+
+	totalTokens := utils.GetIntFromMap(res.Choices[0].GenerationInfo, "TotalTokens")
+	return res.Choices[0].Content, totalTokens, nil
+}

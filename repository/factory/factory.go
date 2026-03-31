@@ -36,6 +36,9 @@ func NewFactory() *Factory {
 			Factory.AgentConfigRepo = orange_grom.NewAgentConfigRepository(gormDB)
 			Factory.UserRepo = orange_grom.NewUserRepository(gormDB)
 			Factory.MemoryRepo = orange_grom.NewMemoryRepository(gormDB)
+			Factory.TaskRepo = orange_grom.NewTaskRepository(gormDB)
+			Factory.SubTaskRepo = orange_grom.NewSubTaskRepository(gormDB)
+			Factory.TaskResultRepo = orange_grom.NewTaskResultRepository(gormDB)
 		}
 		repoFactory = Factory
 	})

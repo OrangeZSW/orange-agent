@@ -10,6 +10,7 @@ import (
 	taskContext "orange-agent/task/context"
 	"orange-agent/task/executor"
 	"orange-agent/task/summarizer"
+	"orange-agent/utils/logger"
 	"sync"
 	"time"
 )
@@ -23,6 +24,7 @@ type TaskOrchestrator struct {
 	activeTasks map[uint]*domain.Task
 	mu          sync.RWMutex
 	repo        factory.Factory
+	log         *logger.Logger
 }
 
 func NewTaskOrchestrator(
@@ -38,6 +40,7 @@ func NewTaskOrchestrator(
 		cm:          cm,
 		activeTasks: make(map[uint]*domain.Task),
 		repo:        *factory.NewFactory(),
+		log:         logger.GetLogger(),
 	}
 }
 
@@ -50,6 +53,7 @@ func (to *TaskOrchestrator) ProcessTask(ctx context.Context, sessionID, taskDesc
 		Status:      domain.StatusPending,
 		Subtasks:    []*domain.SubTask{},
 	}
+	err := to.repo.TaskRepo.CreateTask(task)
 
 	to.mu.Lock()
 	to.activeTasks[task.ID] = task
@@ -64,6 +68,12 @@ func (to *TaskOrchestrator) ProcessTask(ctx context.Context, sessionID, taskDesc
 	// 步骤1: 分析并拆分任务
 	task.Status = domain.StatusRunning
 	subtasks, err := to.analyzer.AnalyzeAndSplit(taskDescription)
+	to.log.Info("分析任务成功，创建子任务：%v", subtasks)
+
+	for _, subtask := range subtasks {
+		subtask.TaskID = task.ID
+		to.repo.SubTaskRepo.CreateSubTask(subtask)
+	}
 	if err != nil {
 		task.Status = domain.StatusFailed
 		return task, fmt.Errorf("failed to analyze task: %w", err)
@@ -85,6 +95,8 @@ func (to *TaskOrchestrator) ProcessTask(ctx context.Context, sessionID, taskDesc
 	task.Result = summary
 	task.Status = domain.StatusCompleted
 	task.UpdatedAt = time.Now()
+
+	to.repo.TaskRepo.UpdateTask(task)
 
 	return task, nil
 }

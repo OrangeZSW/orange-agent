@@ -26,8 +26,8 @@ type SubTask struct {
 	gorm.Model
 	Description string                 `json:"description"`
 	Status      TaskStatus             `json:"status"`
-	Context     *TaskContext           `json:"context"`
-	Input       map[string]interface{} `json:"input"`
+	Context     *TaskContext           `json:"context" gorm:"serializer:json;type:json"`
+	Input       map[string]interface{} `json:"input" gorm:"serializer:json;type:json"`
 	Output      string                 `json:"output"`
 	Error       string                 `json:"error"`
 	TaskID      uint                   `json:"task_id"`
@@ -36,9 +36,9 @@ type SubTask struct {
 
 type TaskContext struct {
 	SystemPrompt string                 `json:"system_prompt"`
-	Messages     []Message              `json:"messages"`
+	Messages     []Message              `json:"messages" gorm:"serializer:json;type:json"`
 	TokenCount   int                    `json:"token_count"`
-	Metadata     map[string]interface{} `json:"metadata"`
+	Metadata     map[string]interface{} `json:"metadata" gorm:"serializer:json;type:json"`
 }
 
 type Message struct {

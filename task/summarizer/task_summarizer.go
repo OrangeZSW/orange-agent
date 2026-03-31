@@ -60,7 +60,7 @@ Summary:`, summary.String())
 
 	finalSummary, err := ts.llmClient.Chat([]domain.Message{
 		{Role: "system", Content: "You are a summary expert. Provide clear, concise summaries of task executions."},
-		{Role: "user", Content: finalPrompt},
+		{Role: "human", Content: finalPrompt},
 	})
 
 	if err != nil {

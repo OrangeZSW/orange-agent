@@ -40,7 +40,7 @@ Analysis:`, taskDescription)
 
 	analysis, err := ta.llmClient.Chat([]domain.Message{
 		{Role: "system", Content: "You are a task analysis expert."},
-		{Role: "user", Content: analysisPrompt},
+		{Role: "human", Content: analysisPrompt},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to analyze task: %w", err)
@@ -71,7 +71,7 @@ Subtasks:`, analysis, taskDescription)
 
 	response, err := ta.llmClient.Chat([]domain.Message{
 		{Role: "system", Content: "You are a task decomposition expert."},
-		{Role: "user", Content: splitPrompt},
+		{Role: "human", Content: splitPrompt},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to split task: %w", err)
