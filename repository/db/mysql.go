@@ -37,7 +37,9 @@ func buildDsn(config *config.DatabaseConfig) string {
 
 // 迁移
 func Migrate(mysql *Mysql) {
-	mysql.DB.AutoMigrate(&domain.AgentConfig{}, &domain.CallRecord{},
-		&domain.Memory{}, &domain.User{},
+	mysql.DB.AutoMigrate(
+		&domain.Task{},
+		&domain.SubTask{},
+		&domain.TaskResult{},
 	)
 }

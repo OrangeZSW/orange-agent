@@ -67,7 +67,7 @@ func handlerAgentTest(ctx context.Context, input string) (string, error) {
 	testBody := map[string]interface{}{
 		"model": agent.Models[0],
 		"messages": []map[string]string{
-			{"role": "user", "content": "Hello"},
+			{"role": "human", "content": "Hello"},
 		},
 		"max_tokens": 5,
 	}

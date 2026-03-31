@@ -37,3 +37,26 @@ type AgentCallRecordRepository interface {
 	GetAgentCallRecordByAgentName(agentName string) ([]domain.CallRecord, error)
 	SelectByMemoryId(memoryId uint) ([]domain.CallRecord, error)
 }
+
+// Task
+type TaskRepository interface {
+	CreateTask(task *domain.Task) error
+	UpdateTask(task *domain.Task) error
+	GetTaskById(id uint) (*domain.Task, error)
+}
+
+// SubTask
+type SubTaskRepository interface {
+	CreateSubTask(subTask *domain.SubTask) error
+	GetSubTaskByTaskId(taskId uint) ([]domain.SubTask, error)
+	UpdateSubTask(subTask *domain.SubTask) error
+	GetSubTaskById(id uint) (*domain.SubTask, error)
+}
+
+// TaskResult
+type TaskResultRepository interface {
+	CreateTaskResult(taskResult *domain.TaskResult) error
+	GetTaskResultBySubTaskId(subTaskId uint) (*domain.TaskResult, error)
+	UpdateTaskResult(taskResult *domain.TaskResult) error
+	GetTaskResultById(id uint) (*domain.TaskResult, error)
+}

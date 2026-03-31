@@ -4,6 +4,7 @@ go 1.25.6
 
 require (
 	github.com/pkoukk/tiktoken-go v0.1.6
+	github.com/sashabaranov/go-openai v1.41.2
 	github.com/spf13/viper v1.21.0
 	github.com/tmc/langchaingo v0.1.14
 	gopkg.in/telebot.v3 v3.3.8
