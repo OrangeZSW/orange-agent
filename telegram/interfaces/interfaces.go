@@ -7,10 +7,8 @@ import (
 )
 
 type Telegram interface {
-	Init(config *domain.Telegram)
-	Start()
-	Stop()
-	SendMessage(telegramId int64, text string)
+	SendTeleGramMessage(telegramId int64, text string)
+	InitTelegram(config *domain.Telegram, answer Ansewer) Client
 }
 
 type Manager interface {
@@ -21,6 +19,7 @@ type Manager interface {
 type Client interface {
 	Init(config *domain.Telegram)
 	Start()
+	SendMessage(telegramId int64, text string)
 }
 
 type Ansewer interface {

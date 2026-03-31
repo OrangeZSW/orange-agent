@@ -1,11 +1,11 @@
 package tools
 
 import (
+	"orange-agent/agent/tools/agent"
+	"orange-agent/agent/tools/file"
+	"orange-agent/agent/tools/git"
+	"orange-agent/agent/tools/system"
 	"orange-agent/common"
-	"orange-agent/tools/agent"
-	"orange-agent/tools/file"
-	"orange-agent/tools/git"
-	"orange-agent/tools/system"
 	"sync"
 
 	"github.com/tmc/langchaingo/llms"

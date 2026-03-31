@@ -13,5 +13,5 @@ func main() {
 	config := config.NewConfig()
 	logger.InitDefaultLogger(config.Logger)
 	resource.GetDataResource().Add(db.InitMysql(&config.Database), "mysql")
-	telegram.InitTelegram(&config.Telegram, agent.NewAgent()).Start()
+	telegram.NewTelegram().InitTelegram(&config.Telegram, agent.NewAgent()).Start()
 }
