@@ -91,6 +91,7 @@ func (c *client) HandleToolCalls(ctx context.Context, message []llms.MessageCont
 				},
 			})
 			c.log.Info("调用工具:%s,参数:%.20s", toolcall.FunctionCall.Name, toolcall.FunctionCall.Arguments)
+			c.manager.TeleGramSendMessage(fmt.Sprintf("调用工具:%s,参数:%v", toolcall.FunctionCall.Name, toolcall.FunctionCall.Arguments))
 			res, err := tools.GetTools()[toolcall.FunctionCall.Name].Call(ctx, toolcall.FunctionCall.Arguments)
 			if err != nil {
 				c.log.Error("调用工具:%s失败,参数:%.20s,错误:%.200s", toolcall.FunctionCall.Name, toolcall.FunctionCall.Arguments, err)

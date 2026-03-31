@@ -26,6 +26,7 @@ func NewTelegram() interfaces.Telegram {
 func (t *telegram) InitTelegram(config *domain.Telegram, answer interfaces.Ansewer) interfaces.Client {
 	client := client.NewClient(answer)
 	client.Init(config)
+	t.client = client
 	return client
 }
 

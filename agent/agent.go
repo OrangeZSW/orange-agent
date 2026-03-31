@@ -7,18 +7,28 @@ import (
 	"orange-agent/domain"
 	"orange-agent/repository"
 	"orange-agent/repository/resource"
+	"sync"
 
 	"github.com/tmc/langchaingo/llms"
 )
 
+var (
+	Agent interfaces.Agent
+	once  sync.Once
+)
+
 type agent struct {
-	repo repository.Repositories
+	repo     *repository.Repositories
+	Telegram interfaces.Telegram
 }
 
 func NewAgent() interfaces.Agent {
-	return &agent{
-		repo: *resource.GetRepositories(),
-	}
+	once.Do(func() {
+		Agent = &agent{
+			repo: resource.GetRepositories(),
+		}
+	})
+	return Agent
 }
 
 func (a *agent) TeleGramChat(modelNmae string, message []llms.MessageContent, user *domain.User) string {

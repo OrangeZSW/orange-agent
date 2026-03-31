@@ -5,24 +5,27 @@ import (
 	"orange-agent/domain"
 	"orange-agent/repository"
 	"orange-agent/repository/resource"
+	"orange-agent/telegram"
 	"orange-agent/utils/logger"
 
 	"github.com/tmc/langchaingo/llms"
 )
 
 type manager struct {
-	User   *domain.User
-	log    *logger.Logger
-	repo   *repository.Repositories
-	memory *domain.Memory
+	User     *domain.User
+	log      *logger.Logger
+	repo     *repository.Repositories
+	memory   *domain.Memory
+	telegram interfaces.Telegram
 }
 
 func NewManager(user *domain.User, memory *domain.Memory) interfaces.Manager {
 	return &manager{
-		log:    logger.GetLogger(),
-		repo:   resource.GetRepositories(),
-		User:   user,
-		memory: memory,
+		log:      logger.GetLogger(),
+		repo:     resource.GetRepositories(),
+		User:     user,
+		memory:   memory,
+		telegram: telegram.GetTelegram(),
 	}
 }
 
@@ -38,4 +41,8 @@ func (r *manager) SaveCallRecord(message []llms.MessageContent, resp *llms.Conte
 		TotalTokens:      resp.Choices[0].GenerationInfo["TotalTokens"].(int),
 	}
 	return r.repo.AgentCallRecord.CreateAgentCallRecord(callRecord)
+}
+
+func (r *manager) TeleGramSendMessage(text string) {
+	r.telegram.SendTeleGramMessage(int64(r.memory.UserId), text)
 }

@@ -16,4 +16,9 @@ type Agent interface {
 
 type Manager interface {
 	SaveCallRecord(message []llms.MessageContent, resp *llms.ContentResponse, agentConfig *domain.AgentConfig) error
+	TeleGramSendMessage(text string)
+}
+
+type Telegram interface {
+	SendTeleGramMessage(telegramId int64, text string)
 }
