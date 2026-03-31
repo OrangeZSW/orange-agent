@@ -69,8 +69,12 @@ func handlerAgentAdd(ctx context.Context, input string) (string, error) {
 	}
 
 	// 检查是否已存在
-	if _, err := factory.AgentConfigRepo.GetAgentConfigByName(params.Name); err == nil {
-		return "", fmt.Errorf("Agent %s 已存在", params.Name)
+	existingAgent, err := factory.AgentConfigRepo.GetAgentConfigByName(params.Name)
+	if err != nil {
+		return "", fmt.Errorf("failed to check existing Agent: %v", err)
+	}
+	if existingAgent != nil {
+		return "", fmt.Errorf("Agent with name %s already exists", params.Name)
 	}
 
 	// 处理模型列表

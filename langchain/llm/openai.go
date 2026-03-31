@@ -3,6 +3,8 @@ package llm
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/url"
 
 	"orange-agent/domain"
 	"orange-agent/repository/factory"
@@ -42,11 +44,13 @@ func (p *OpenAIProvider) GetLLM(model string) (*openai.LLM, error) {
 	}
 
 	p.agentConfig = config
+	http, _ := p.createHTTPClient("http://127.0.0.1:7897")
 
 	llm, err := openai.New(
 		openai.WithModel(model),
 		openai.WithBaseURL(config.BaseUrl),
 		openai.WithToken(config.Token),
+		openai.WithHTTPClient(http),
 	)
 	if err != nil {
 		p.log.Error("创建 OpenAI LLM 失败: %v", err)
@@ -117,4 +121,24 @@ func (p *OpenAIProvider) saveCallRecord(response *llms.ContentResponse) error {
 
 func (p *OpenAIProvider) GetCurrentConfig() *domain.AgentConfig {
 	return p.agentConfig
+}
+
+// 设置代理的方法
+func (p *OpenAIProvider) createHTTPClient(proxyURL string) (*http.Client, error) {
+	if proxyURL == "" {
+		return &http.Client{}, nil
+	}
+
+	proxy, err := url.Parse(proxyURL)
+	if err != nil {
+		return nil, fmt.Errorf("解析代理URL失败: %w", err)
+	}
+
+	transport := &http.Transport{
+		Proxy: http.ProxyURL(proxy),
+	}
+
+	return &http.Client{
+		Transport: transport,
+	}, nil
 }
