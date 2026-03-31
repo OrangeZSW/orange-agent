@@ -71,7 +71,10 @@ func (c *client) listenMessage() {
 	})
 }
 func (c *client) SendMessage(telegramId int64, text string) {
-	_, err := c.bot.Send(telebot.ChatID(telegramId), text)
+	recipient := &telebot.User{
+		ID: telegramId,
+	}
+	_, err := c.bot.Send(recipient, text)
 	if err != nil {
 		c.log.Error("发送消息失败: %v", err)
 	}
