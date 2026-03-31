@@ -268,7 +268,7 @@ func (l *Logger) Rotate() error {
 
 	// 重命名旧文件 app-2024-06-01.log
 	oldPath := l.file.Name()
-	newPath := fmt.Sprintf("%s-%s.log", strings.TrimSuffix(oldPath, ".log"), time.Now().Format("2006-01-02"))
+	newPath := fmt.Sprintf("%s-%s.log", strings.TrimSuffix(oldPath, ".log"), l.GetLastModifiedTime())
 	if err := os.Rename(oldPath, newPath); err != nil {
 		return err
 	}
