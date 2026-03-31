@@ -41,6 +41,5 @@ func (a *agent) TeleGramChat(modelNmae string, message []llms.MessageContent, us
 	//update memory
 	memory.AgentAnswer = res
 	a.repo.Memory.UpdateMemory(memory)
-
 	return res
 }

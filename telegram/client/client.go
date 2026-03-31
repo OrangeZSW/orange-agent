@@ -67,7 +67,6 @@ func (c *client) listenMessage() {
 		if err != nil {
 			c.log.Error("发送消息失败: %v", err)
 		}
-		t.Reply(err.Error())
 		return nil
 	})
 }

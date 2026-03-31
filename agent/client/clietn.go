@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"orange-agent/agent/interfaces"
+	"orange-agent/agent/tools"
 	"orange-agent/domain"
 	"orange-agent/repository"
 	"orange-agent/repository/resource"
@@ -53,14 +54,64 @@ func (c *client) Chat(modelName string, message []llms.MessageContent) string {
 	if err != nil {
 		return fmt.Sprintf("调用LLM失败:%v", err)
 	}
+	if len(resp.Choices[0].ToolCalls) > 0 {
+		return c.HandleToolCalls(ctx, message, resp)
+	}
+
 	return resp.Choices[0].Content
 }
 
 func (c *client) call(ctx context.Context, message []llms.MessageContent) (*llms.ContentResponse, error) {
-	resp, err := c.llm.GenerateContent(ctx, message)
+	resp, err := c.llm.GenerateContent(ctx, message, llms.WithTools(tools.GetEllTools()))
 	if err != nil {
 		return nil, err
 	}
 	c.manager.SaveCallRecord(message, resp, c.AgentConfig)
 	return resp, nil
+}
+
+func (c *client) HandleToolCalls(ctx context.Context, message []llms.MessageContent, resp *llms.ContentResponse) string {
+	toolsMessage := llms.MessageContent{
+		Role:  llms.ChatMessageTypeTool,
+		Parts: []llms.ContentPart{},
+	}
+	aiMessage := llms.MessageContent{
+		Role:  llms.ChatMessageTypeAI,
+		Parts: []llms.ContentPart{},
+	}
+	toolcalls := resp.Choices[0].ToolCalls
+	if len(toolcalls) > 0 {
+		for _, toolcall := range toolcalls {
+			aiMessage.Parts = append(aiMessage.Parts, llms.ToolCall{
+				ID:   toolcall.ID,
+				Type: toolcall.Type,
+				FunctionCall: &llms.FunctionCall{
+					Name:      toolcall.FunctionCall.Name,
+					Arguments: toolcall.FunctionCall.Arguments,
+				},
+			})
+			c.log.Info("调用工具:%s,参数:%.100s", toolcall.FunctionCall.Name, toolcall.FunctionCall.Arguments)
+			res, err := tools.GetTools()[toolcall.FunctionCall.Name].Call(ctx, toolcall.FunctionCall.Arguments)
+			if err != nil {
+				c.log.Error("调用工具:%s失败,参数:%.100s,错误:%.200s", toolcall.FunctionCall.Name, toolcall.FunctionCall.Arguments, err)
+				res = "调用工具失败"
+			}
+			c.log.Info("调用工具:%s成功,参数:%.100s,工具输出:%.200s", toolcall.FunctionCall.Name, toolcall.FunctionCall.Arguments, res)
+			toolsMessage.Parts = append(toolsMessage.Parts, llms.ToolCallResponse{
+				ToolCallID: toolcall.ID,
+				Content:    res,
+				Name:       toolcall.FunctionCall.Name,
+			})
+		}
+	}
+	message = append(message, aiMessage)
+	message = append(message, toolsMessage)
+	resp, err := c.call(ctx, message)
+	if err != nil {
+		return fmt.Sprintf("工具调用中-调用LLM失败:%v", err)
+	}
+	if len(resp.Choices[0].ToolCalls) > 0 {
+		return c.HandleToolCalls(ctx, message, resp)
+	}
+	return resp.Choices[0].Content
 }
