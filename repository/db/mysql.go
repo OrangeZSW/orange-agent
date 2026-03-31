@@ -16,7 +16,7 @@ type Mysql struct {
 	config *domain.DatabaseConfig
 }
 
-func InitMysql(config *domain.DatabaseConfig) (*Mysql, error) {
+func InitMysql(config *domain.DatabaseConfig) *Mysql {
 	db := &Mysql{
 		config: config,
 	}
@@ -24,13 +24,13 @@ func InitMysql(config *domain.DatabaseConfig) (*Mysql, error) {
 	coon, err := gorm.Open(mysql.Open(buildDsn(config)), &gorm.Config{})
 	if err != nil {
 		log.Error("数据库连接失败:%s", err.Error())
-		return nil, err
+		return nil
 	}
 	log.Info("数据库连接成功")
 	db.db = coon
 	db.config = config
 	Migrate(db) // 迁移
-	return db, nil
+	return db
 }
 
 func buildDsn(config *domain.DatabaseConfig) string {
