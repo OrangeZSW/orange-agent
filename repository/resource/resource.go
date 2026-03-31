@@ -1,8 +1,8 @@
 package resource
 
 import (
-	"orange-agent/config"
-	"orange-agent/repository/db"
+	"orange-agent/repository"
+	"orange-agent/utils/logger"
 	"sync"
 )
 
@@ -11,26 +11,36 @@ var (
 	once         sync.Once
 )
 
-type DataResource struct {
-	Mysql *db.Mysql // 改为指针类型
+type Resource interface {
+	InitRepo() (*repository.Repositories, error)
 }
 
-func NewDataResource() *DataResource {
+type DataResource struct {
+	Resource     map[string]Resource
+	log          *logger.Logger
+	repositories *repository.Repositories
+}
+
+func GetDataResource() *DataResource {
 	once.Do(func() {
-		dataResource = &DataResource{}
+		dataResource = &DataResource{
+			Resource: make(map[string]Resource),
+			log:      logger.GetLogger(),
+		}
 	})
 	return dataResource
 }
 
-func (d *DataResource) InitMysql(config *config.DatabaseConfig) error {
-	mysql, err := db.NewMysql(config)
+func (r *DataResource) Add(resource Resource, name string) {
+	r.Resource[name] = resource
+	repositories, err := resource.InitRepo()
 	if err != nil {
-		return err
+		r.log.Error("InitRepo error: %v", err)
+		return
 	}
-	dataResource.Mysql = mysql
-	return nil
+	r.repositories = repositories
 }
 
-func GetDataResource() *DataResource {
-	return NewDataResource()
+func GetRepositories() *repository.Repositories {
+	return GetDataResource().repositories
 }

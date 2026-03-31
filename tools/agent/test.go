@@ -8,7 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"orange-agent/common"
-	"orange-agent/repository/factory"
+	"orange-agent/repository/resource"
 	"time"
 )
 
@@ -29,7 +29,7 @@ var AgentTestTool = common.BaseTool{
 }
 
 func handlerAgentTest(ctx context.Context, input string) (string, error) {
-	repo := factory.NewFactory()
+	repo := resource.GetRepositories()
 	// 解析JSON参数
 	var params struct {
 		Name string `json:"name"`
@@ -42,7 +42,7 @@ func handlerAgentTest(ctx context.Context, input string) (string, error) {
 	if params.Name == "" {
 		return "", fmt.Errorf("name is required")
 	}
-	agent, err := repo.AgentConfigRepo.GetAgentConfigByName(params.Name)
+	agent, err := repo.AgentConfig.GetAgentConfigByName(params.Name)
 	if err != nil {
 		return "", fmt.Errorf("Agent %s 不存在", params.Name)
 	}

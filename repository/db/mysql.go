@@ -1,20 +1,22 @@
 package db
 
 import (
-	"orange-agent/config"
 	"orange-agent/domain"
+	"orange-agent/repository"
 	"orange-agent/utils/logger"
+
+	mysql_gorm "orange-agent/repository/gorm"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
 type Mysql struct {
-	DB     *gorm.DB
-	config *config.DatabaseConfig
+	db     *gorm.DB
+	config *domain.DatabaseConfig
 }
 
-func NewMysql(config *config.DatabaseConfig) (*Mysql, error) {
+func InitMysql(config *domain.DatabaseConfig) (*Mysql, error) {
 	db := &Mysql{
 		config: config,
 	}
@@ -25,21 +27,33 @@ func NewMysql(config *config.DatabaseConfig) (*Mysql, error) {
 		return nil, err
 	}
 	log.Info("数据库连接成功")
-	db.DB = coon
+	db.db = coon
 	db.config = config
 	Migrate(db) // 迁移
 	return db, nil
 }
 
-func buildDsn(config *config.DatabaseConfig) string {
+func buildDsn(config *domain.DatabaseConfig) string {
 	return config.Username + ":" + config.Password + "@tcp(" + config.Host + ":" + config.Port + ")/" + config.Database + "?charset=utf8mb4&parseTime=True&loc=Local"
 }
 
 // 迁移
 func Migrate(mysql *Mysql) {
-	mysql.DB.AutoMigrate(
+	mysql.db.AutoMigrate(
 		&domain.Task{},
 		&domain.SubTask{},
 		&domain.TaskResult{},
 	)
+}
+
+func (m *Mysql) InitRepo() (*repository.Repositories, error) {
+	return &repository.Repositories{
+		Task:            mysql_gorm.NewTaskRepository(m.db),
+		SubTask:         mysql_gorm.NewSubTaskRepository(m.db),
+		TaskResult:      mysql_gorm.NewTaskResultRepository(m.db),
+		User:            mysql_gorm.NewUserRepository(m.db),
+		AgentConfig:     mysql_gorm.NewAgentConfigRepository(m.db),
+		Memory:          mysql_gorm.NewMemoryRepository(m.db),
+		AgentCallRecord: mysql_gorm.NewAgentCallRecordRepository(m.db),
+	}, nil
 }

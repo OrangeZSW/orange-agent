@@ -3,7 +3,7 @@ package logger
 import (
 	"fmt"
 	"io"
-	"orange-agent/config"
+	"orange-agent/domain"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -47,7 +47,7 @@ var (
 )
 
 // NewLogger 创建新的日志记录器
-func NewLogger(config config.Logger) (*Logger, error) {
+func NewLogger(config domain.Logger) (*Logger, error) {
 	logger := &Logger{
 		module:     config.Module,
 		showCaller: config.ShowCaller,
@@ -109,7 +109,7 @@ func NewLogger(config config.Logger) (*Logger, error) {
 }
 
 // InitDefaultLogger 初始化默认日志记录器
-func InitDefaultLogger(config config.Logger) error {
+func InitDefaultLogger(config domain.Logger) error {
 	var err error
 	once.Do(func() {
 		defaultLogger, err = NewLogger(config)
@@ -121,7 +121,7 @@ func InitDefaultLogger(config config.Logger) error {
 func GetLogger() *Logger {
 	if defaultLogger == nil {
 		// 使用默认配置
-		config := config.Logger{
+		config := domain.Logger{
 			Level:  "info",
 			Output: "console",
 		}

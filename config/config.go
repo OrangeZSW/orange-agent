@@ -2,51 +2,18 @@ package config
 
 import (
 	"fmt"
+	"orange-agent/domain"
 	"sync"
 
 	"github.com/spf13/viper"
 )
 
 var (
-	AppConfig *Config
+	AppConfig *domain.Config
 	Once      sync.Once
 )
 
-type Config struct {
-	Telegram Telegram       `mapstructure:"telegram"`
-	Database DatabaseConfig `mapstructure:"database"`
-	Logger   Logger         `mapstructure:"logger"`
-}
-
-type Telegram struct {
-	BotToken string `mapstructure:"bot_token"`
-	Proxy    string `mapstructure:"proxy"`
-	Promete  string `mapstructure:"promete"`
-}
-
-type DatabaseConfig struct {
-	Driver   string `mapstructure:"driver"`
-	Host     string `mapstructure:"host"`
-	Port     string `mapstructure:"port"`
-	Username string `mapstructure:"username"`
-	Password string `mapstructure:"password"`
-	Database string `mapstructure:"database"`
-}
-
-type Logger struct {
-	Level      string `mapstructure:"level"`
-	Output     string `mapstructure:"output"`
-	FilePath   string `mapstructure:"file_path"`
-	FileName   string `mapstructure:"file_name"`
-	MaxSize    int    `mapstructure:"max_size"`
-	MaxAge     int    `mapstructure:"max_age"`
-	MaxBackups int    `mapstructure:"max_backups"`
-	Compress   bool   `mapstructure:"compress"`
-	ShowCaller bool   `mapstructure:"show_caller"`
-	Module     string `mapstructure:"module"`
-}
-
-func NewConfig() *Config {
+func NewConfig() *domain.Config {
 	Once.Do(func() {
 		var err error
 		AppConfig, err = loadConfig("config.yaml")
@@ -56,7 +23,7 @@ func NewConfig() *Config {
 	})
 	return AppConfig
 }
-func loadConfig(configPath string) (*Config, error) {
+func loadConfig(configPath string) (*domain.Config, error) {
 	viper.SetConfigFile(configPath)
 	viper.SetConfigType("yaml") // 或 json, toml, env 等
 
@@ -69,7 +36,7 @@ func loadConfig(configPath string) (*Config, error) {
 		return nil, fmt.Errorf("读取配置文件失败: %w", err)
 	}
 
-	var config Config
+	var config domain.Config
 	if err := viper.Unmarshal(&config); err != nil {
 		return nil, fmt.Errorf("解析配置失败: %w", err)
 	}

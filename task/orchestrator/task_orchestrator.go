@@ -5,7 +5,8 @@ import (
 	"context"
 	"fmt"
 	"orange-agent/domain"
-	"orange-agent/repository/factory"
+	"orange-agent/repository"
+	"orange-agent/repository/resource"
 	"orange-agent/task/analyzer"
 	taskContext "orange-agent/task/context"
 	"orange-agent/task/executor"
@@ -23,7 +24,7 @@ type TaskOrchestrator struct {
 
 	activeTasks map[uint]*domain.Task
 	mu          sync.RWMutex
-	repo        factory.Factory
+	repo        repository.Repositories
 	log         *logger.Logger
 }
 
@@ -39,7 +40,7 @@ func NewTaskOrchestrator(
 		summarizer:  summarizer,
 		cm:          cm,
 		activeTasks: make(map[uint]*domain.Task),
-		repo:        *factory.NewFactory(),
+		repo:        *resource.GetRepositories(),
 		log:         logger.GetLogger(),
 	}
 }
@@ -53,7 +54,7 @@ func (to *TaskOrchestrator) ProcessTask(ctx context.Context, sessionID, taskDesc
 		Status:      domain.StatusPending,
 		Subtasks:    []*domain.SubTask{},
 	}
-	err := to.repo.TaskRepo.CreateTask(task)
+	err := to.repo.Task.CreateTask(task)
 
 	to.mu.Lock()
 	to.activeTasks[task.ID] = task
@@ -72,7 +73,7 @@ func (to *TaskOrchestrator) ProcessTask(ctx context.Context, sessionID, taskDesc
 
 	for _, subtask := range subtasks {
 		subtask.TaskID = task.ID
-		to.repo.SubTaskRepo.CreateSubTask(subtask)
+		to.repo.SubTask.CreateSubTask(subtask)
 	}
 	if err != nil {
 		task.Status = domain.StatusFailed
@@ -96,7 +97,7 @@ func (to *TaskOrchestrator) ProcessTask(ctx context.Context, sessionID, taskDesc
 	task.Status = domain.StatusCompleted
 	task.UpdatedAt = time.Now()
 
-	to.repo.TaskRepo.UpdateTask(task)
+	to.repo.Task.UpdateTask(task)
 
 	return task, nil
 }

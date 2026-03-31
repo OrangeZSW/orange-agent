@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"orange-agent/common"
 	"orange-agent/domain"
-	factory "orange-agent/repository/factory"
+	"orange-agent/repository/resource"
 	"strings"
 )
 
@@ -43,7 +43,7 @@ var AgentAddTool = common.BaseTool{
 }
 
 func handlerAgentAdd(ctx context.Context, input string) (string, error) {
-	factory := factory.NewFactory()
+	factory := resource.GetRepositories()
 	// 解析JSON参数
 	var params struct {
 		Name     string `json:"name"`
@@ -69,7 +69,7 @@ func handlerAgentAdd(ctx context.Context, input string) (string, error) {
 	}
 
 	// 检查是否已存在
-	existingAgent, err := factory.AgentConfigRepo.GetAgentConfigByName(params.Name)
+	existingAgent, err := factory.AgentConfig.GetAgentConfigByName(params.Name)
 	if err != nil {
 		return "", fmt.Errorf("failed to check existing Agent: %v", err)
 	}
@@ -90,7 +90,7 @@ func handlerAgentAdd(ctx context.Context, input string) (string, error) {
 		Models:  models,
 	}
 
-	if err := factory.AgentConfigRepo.CreateAgentConfig(&agentConfig); err != nil {
+	if err := factory.AgentConfig.CreateAgentConfig(&agentConfig); err != nil {
 		return "", fmt.Errorf("创建Agent配置失败: %v", err)
 	}
 

@@ -4,6 +4,16 @@ import (
 	"orange-agent/domain"
 )
 
+type Repositories struct {
+	AgentCallRecord AgentCallRecordRepository
+	AgentConfig     AgentConfigRepository
+	User            UserRepository
+	Memory          MemoryRepository
+	Task            TaskRepository
+	SubTask         SubTaskRepository
+	TaskResult      TaskResultRepository
+}
+
 // UserRepository 用户仓储接口
 type UserRepository interface {
 	CreateUser(user *domain.User) error

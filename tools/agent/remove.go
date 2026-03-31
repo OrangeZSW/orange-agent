@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"orange-agent/common"
-	factory "orange-agent/repository/factory"
+	"orange-agent/repository/resource"
 	"orange-agent/utils"
 )
 
@@ -26,19 +26,19 @@ var AgentRemoveTool = common.BaseTool{
 }
 
 func handleAgentRemove(ctx context.Context, input string) (string, error) {
-	repo := factory.NewFactory()
+	repo := resource.GetRepositories()
 	params, err := utils.StrToMap(input)
 	if err != nil {
 		return "", err
 	}
 	name := params["name"].(string)
 
-	agent, err := repo.AgentConfigRepo.GetAgentConfigByName(name)
+	agent, err := repo.AgentConfig.GetAgentConfigByName(name)
 	if err != nil {
 		return "", fmt.Errorf("Agent %s 不存在", name)
 	}
 
-	if err := repo.AgentConfigRepo.DeleteAgentConfig(agent); err != nil {
+	if err := repo.AgentConfig.DeleteAgentConfig(agent); err != nil {
 		return "", fmt.Errorf("删除Agent配置失败: %v", err)
 	}
 

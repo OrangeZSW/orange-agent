@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"orange-agent/common"
-	factory "orange-agent/repository/factory"
+	"orange-agent/repository/resource"
 	"strings"
 )
 
@@ -42,7 +42,7 @@ var AgentUpdateTool = common.BaseTool{
 }
 
 func handlerAgentUpdate(ctx context.Context, input string) (string, error) {
-	repo := factory.NewFactory()
+	repo := resource.GetRepositories()
 	// 解析JSON参数
 	var params struct {
 		Name     string `json:"name"`
@@ -60,7 +60,7 @@ func handlerAgentUpdate(ctx context.Context, input string) (string, error) {
 		return "", fmt.Errorf("name is required")
 	}
 
-	agent, err := repo.AgentConfigRepo.GetAgentConfigByName(params.Name)
+	agent, err := repo.AgentConfig.GetAgentConfigByName(params.Name)
 	if err != nil {
 		return "", fmt.Errorf("Agent %s 不存在", params.Name)
 	}
@@ -76,7 +76,7 @@ func handlerAgentUpdate(ctx context.Context, input string) (string, error) {
 		agent.Models = strings.Split(params.Model, ",")
 	}
 
-	if err := repo.AgentConfigRepo.UpdateAgentConfig(agent); err != nil {
+	if err := repo.AgentConfig.UpdateAgentConfig(agent); err != nil {
 		return "", fmt.Errorf("更新Agent配置失败: %v", err)
 	}
 
