@@ -1,18 +1,19 @@
 # Orange Agent - 智能 Telegram 代理机器人
 
-Orange Agent 是一个基于 Go 语言开发的 Telegram 智能代理机器人，集成了 LangChain 框架，支持多 AI 模型切换和工具调用功能。
+Orange Agent 是一个基于 Go 语言开发的 Telegram 智能代理机器人，集成了 LangChain 框架，支持多 AI 模型切换、工具调用和 Telegram 消息通知功能。
 
 ## 功能特性
 
 - 🤖 **多 AI 代理支持**：支持配置多个 AI 代理（如 OpenAI、本地模型等）
 - 🔄 **模型热切换**：支持运行时切换不同的 AI 模型
-- 🛠️ **工具调用**：支持文件操作、时间查询等工具调用
+- 🛠️ **工具调用**：支持文件操作、时间查询、Git 操作等工具调用
 - 🌐 **联网搜索**：支持搜索引擎查询和网页内容抓取
 - 💾 **对话记忆**：保存用户对话历史，提供上下文感知
 - 📊 **使用统计**：记录 AI 调用次数和 Token 使用情况
+- 🔔 **Telegram 消息通知**：支持发送系统通知和任务状态更新
 - 🔧 **配置管理**：通过配置文件灵活管理代理和模型
 - 🚀 **代理支持**：支持 HTTP 代理连接 Telegram API
-- 📨 **Telegram 集成**：完整的 Telegram Bot 功能，支持消息通知
+- 🎯 **Agent 单例模式**：优化 Agent 管理，提升性能和稳定性
 
 ## 项目结构
 
@@ -26,7 +27,7 @@ orange-agent/
 │   │   └── interfaces.go
 │   ├── manager/                  # Agent 管理器
 │   │   └── manager.go
-│   ├── task/                     # 任务处理
+│   ├── task/                     # 任务处理模块
 │   │   ├── analyzer/             # 任务分析器
 │   │   ├── context/              # 任务上下文
 │   │   ├── executor/             # 任务执行器
@@ -69,11 +70,8 @@ orange-agent/
 │       └── resource.go
 ├── telegram/                     # Telegram Bot 处理
 │   ├── client/                   # Telegram 客户端
-│   │   └── client.go
 │   ├── interfaces/               # Telegram 接口
-│   │   └── interfaces.go
 │   ├── manager/                  # Telegram 管理器
-│   │   └── manager.go
 │   └── telegram.go
 ├── utils/                        # 通用工具函数
 │   ├── file/                     # 文件工具
@@ -171,7 +169,7 @@ chmod +x start.sh
 
 ### 基础命令
 
-- `/start` - 显示欢迎信息
+- `/start` - 显示欢迎信息并启动服务
 - `/help` - 显示帮助信息
 - `/agents` - 显示所有可用的 AI 代理
 - `/model` - 显示当前使用的模型
@@ -312,6 +310,13 @@ VALUES ('OpenAI', 'https://api.openai.com/v1', 'sk-xxx', '["gpt-3.5-turbo", "gpt
 2. 实现相应的配置加载逻辑
 3. 通过 `/addAgent` 命令添加新代理
 
+### 任务处理流程
+
+1. **任务分析** (`analyzer`) - 分析用户请求，确定任务类型
+2. **任务编排** (`orchestrator`) - 规划任务执行步骤
+3. **任务执行** (`executor`) - 执行具体操作
+4. **任务总结** (`summarizer`) - 汇总执行结果
+
 ## 日志系统
 
 日志系统支持多级别输出：
@@ -344,10 +349,6 @@ VALUES ('OpenAI', 'https://api.openai.com/v1', 'sk-xxx', '["gpt-3.5-turbo", "gpt
    - 检查网络连接
    - 确认可以访问 DuckDuckGo API
    - 如需使用 Google/Bing，需配置相应 API Key
-5. **Telegram 消息发送失败**
-
-   - 检查接收者对象构造是否正确
-   - 确认 ChatID 格式正确
 
 ### 查看日志
 
@@ -377,21 +378,22 @@ tail -f log/orange-agent.log
 
 ## 更新日志
 
-### v1.3.1 (2026-03-29)
+### v1.4.0 (2026-03-29)
 
-- 🐛 **修复 Telegram 消息发送问题**
-  - 修复 `telegram/client/client.go` 中 `SendMessage` 方法的接收者对象构造
-  - 将直接传入 ChatID 改为构造 `telebot.User` 对象作为接收者
-  - 确保消息能正确发送到指定用户
-- 📝 **更新项目结构文档**
-  - 修正 README 中的项目结构描述
-  - 更新 `agent/` 目录结构说明
-  - 补充 `repository/gorm/` 中的新增模型
-- 🏗️ **优化代码架构**
-  - 完善 Agent 单例模式实现
-  - 改进 Telegram 客户端封装
+- ✨ **新增 Telegram 消息通知功能**：支持发送系统通知和任务状态更新
+- 🎯 **优化 Agent 单例模式**：改进 Agent 管理架构，提升性能和稳定性
+- 📦 **重构项目结构**：采用更清晰的模块化架构
+  - 新增 `agent/` 目录作为核心模块
+  - 完善任务处理流程（analyzer → orchestrator → executor → summarizer）
+  - 优化 `repository/` 层次结构，新增任务相关表
+  - 改进 `telegram/` 模块，支持消息通知
+- 📝 **更新文档**：修正 README 中的路径错误和结构描述
+  - 修正 `lanchain/` → `langchain/`
+  - 修正 `promete/telegram.text` → `promet/telegram.md`
+  - 更新项目结构树，反映最新目录布局
+- 🐛 **持续改进**：修复已知问题，提升稳定性
 
-### v1.3.0 (2026-03-29)
+### v1.3.0 (2026-03-28)
 
 - ✨ **重构项目结构**：采用更清晰的模块化架构
   - 新增 `common/` 目录存放通用工具

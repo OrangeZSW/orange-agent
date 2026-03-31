@@ -71,6 +71,7 @@ func (c *client) listenMessage() {
 	})
 }
 func (c *client) SendMessage(telegramId int64, text string) {
+	c.log.Info("发送消息,userid:%d", telegramId)
 	recipient := &telebot.User{
 		ID: telegramId,
 	}

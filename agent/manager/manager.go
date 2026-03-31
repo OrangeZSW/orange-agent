@@ -44,5 +44,5 @@ func (r *manager) SaveCallRecord(message []llms.MessageContent, resp *llms.Conte
 }
 
 func (r *manager) TeleGramSendMessage(text string) {
-	r.telegram.SendTeleGramMessage(int64(r.memory.UserId), text)
+	r.telegram.SendTeleGramMessage(int64(r.User.TelegramId), text)
 }
