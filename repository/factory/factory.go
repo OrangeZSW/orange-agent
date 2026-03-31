@@ -19,6 +19,9 @@ type Factory struct {
 	AgentConfigRepo     repository.AgentConfigRepository
 	UserRepo            repository.UserRepository
 	MemoryRepo          repository.MemoryRepository
+	TaskRepo            repository.TaskRepository
+	SubTaskRepo         repository.SubTaskRepository
+	TaskResultRepo      repository.TaskResultRepository
 }
 
 func NewFactory() *Factory {

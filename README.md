@@ -1,17 +1,17 @@
-# Orange Agent - 智能Telegram代理机器人
+# Orange Agent - 智能 Telegram 代理机器人
 
 Orange Agent 是一个基于 Go 语言开发的 Telegram 智能代理机器人，集成了 LangChain 框架，支持多 AI 模型切换和工具调用功能。
 
 ## 功能特性
 
-- 🤖 **多AI代理支持**：支持配置多个AI代理（如OpenAI、本地模型等）
-- 🔄 **模型热切换**：支持运行时切换不同的AI模型
+- 🤖 **多 AI 代理支持**：支持配置多个 AI 代理（如 OpenAI、本地模型等）
+- 🔄 **模型热切换**：支持运行时切换不同的 AI 模型
 - 🛠️ **工具调用**：支持文件操作、时间查询等工具调用
 - 🌐 **联网搜索**：支持搜索引擎查询和网页内容抓取
 - 💾 **对话记忆**：保存用户对话历史，提供上下文感知
-- 📊 **使用统计**：记录AI调用次数和Token使用情况
+- 📊 **使用统计**：记录 AI 调用次数和 Token 使用情况
 - 🔧 **配置管理**：通过配置文件灵活管理代理和模型
-- 🚀 **代理支持**：支持HTTP代理连接Telegram API
+- 🚀 **代理支持**：支持 HTTP 代理连接 Telegram API
 
 ## 项目结构
 
@@ -21,24 +21,40 @@ orange-agent/
 │   ├── base_tool.go
 │   └── file_node.go
 ├── config/                       # 配置管理
-│   └── config.go
+│   ├── config.go
+│   └── config.yaml
 ├── domain/                       # 领域模型（纯数据，无依赖）
 │   ├── agentConfig.go
 │   ├── memory.go
 │   └── user.go
-├── lanchain/                     # LangChain集成层
-│   ├── executeTool.go
-│   ├── handeler.go
-│   ├── lanchain.go
-│   └── message.go
-├── promete/                      # 系统提示词
-│   └── telegram.text
+├── langchain/                    # LangChain 集成层
+│   ├── chain/                    # 链式处理
+│   │   └── chain.go
+│   ├── handler/                  # 处理器
+│   │   └── answer_handler.go
+│   ├── interfaces/               # 接口定义
+│   │   └── interfaces.go
+│   ├── llm/                      # 大语言模型
+│   │   ├── openai.go
+│   │   └── provider.go
+│   ├── memory/                   # 记忆管理
+│   │   ├── db_memory.go
+│   │   └── manager.go
+│   ├── message/                  # 消息处理
+│   │   ├── builder.go
+│   │   ├── cleaner.go
+│   │   └── token_counter.go
+│   └── tool/                     # 工具管理
+│       ├── executor.go
+│       └── manager.go
+├── promet/                       # 系统提示词
+│   └── telegram.md
 ├── repository/                   # 数据访问层
 │   ├── db/                       # 数据库实现
 │   │   └── mysql.go
 │   ├── factory/                  # 工厂模式
 │   │   └── factory.go
-│   ├── grom/                     # GORM模型
+│   ├── grom/                     # GORM 模型
 │   │   ├── agentCallRecord.go
 │   │   ├── agentConfig.go
 │   │   ├── memory.go
@@ -46,22 +62,23 @@ orange-agent/
 │   ├── interface.go              # 接口定义
 │   └── resource/                 # 资源管理
 │       └── resource.go
-├── telegram/                     # Telegram Bot处理
+├── telegram/                     # Telegram Bot 处理
 │   ├── bot.go
 │   ├── command.go
-│   └── text.go
+│   ├── text.go
+│   └── tool.go
 ├── tools/                        # 工具系统
-│   ├── agent/                    # Agent管理工具
+│   ├── agent/                    # Agent 管理工具
 │   ├── file/                     # 文件操作工具
-│   ├── git/                      # Git操作工具
+│   ├── git/                      # Git 操作工具
 │   └── system/                   # 系统工具
 ├── utils/                        # 通用工具函数
 │   ├── file/                     # 文件工具
 │   ├── logger/                   # 日志工具
+│   ├── map.go
 │   └── utils.go
-├── config.yaml                   # 应用配置文件
 ├── main.go                       # 主入口文件
-├── go.mod                        # Go模块定义
+├── go.mod                        # Go 模块定义
 ├── build.sh                      # 构建脚本
 ├── start.sh                      # 启动脚本
 ├── fix-mod.sh                    # 模块修复脚本
@@ -93,7 +110,7 @@ CREATE DATABASE `orange-agent` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 telegram:
   bot_token: "YOUR_TELEGRAM_BOT_TOKEN"  # 从 @BotFather 获取
   proxy: "http://127.0.0.1:7897"       # 代理地址（可选）
-  promete: "promete/telegram.text"     # 系统提示词文件
+  promete: "promet/telegram.md"        # 系统提示词文件
 
 database:
   driver: "mysql"
@@ -151,12 +168,12 @@ chmod +x start.sh
 
 - `/start` - 显示欢迎信息
 - `/help` - 显示帮助信息
-- `/agents` - 显示所有可用的AI代理
+- `/agents` - 显示所有可用的 AI 代理
 - `/model` - 显示当前使用的模型
 
 ### 管理命令
 
-- `/addAgent <agent_name> <base_url> <token>` - 添加新的AI代理
+- `/addAgent <agent_name> <base_url> <token>` - 添加新的 AI 代理
 
   - 示例：`/addAgent OpenAI https://api.openai.com/v1 sk-xxx`
 - `/addModel <agent_id> <model_name>` - 为代理添加模型
@@ -168,7 +185,7 @@ chmod +x start.sh
 
 ### 交互使用
 
-直接发送消息即可与AI对话，系统会自动处理工具调用和上下文记忆。
+直接发送消息即可与 AI 对话，系统会自动处理工具调用和上下文记忆。
 
 ## 工具系统
 
@@ -183,6 +200,7 @@ Orange Agent 集成了以下工具：
 - `file_rename` - 重命名文件
 - `file_copy` - 复制文件
 - `file_search` - 搜索文件内容
+- `randomReadFile` - 随机读取文件内容
 
 ### Git 工具
 
@@ -200,7 +218,7 @@ Orange Agent 集成了以下工具：
 - `test_run` - 运行测试
 - `dependency_check` - 检查依赖
 - `performance_monitor` - 性能监控
-- `api_tester` - API接口测试
+- `api_tester` - API 接口测试
 
 ### 🌐 联网搜索工具
 
@@ -217,7 +235,7 @@ Orange Agent 集成了以下工具：
 
 ```
 # 搜索关键词
-搜索 "Go语言教程"
+搜索 "Go 语言教程"
 
 # 抓取网页内容
 抓取 https://example.com 的内容
@@ -228,7 +246,7 @@ Orange Agent 集成了以下工具：
 
 **参数说明：**
 
-- `query`: 搜索关键词或URL
+- `query`: 搜索关键词或 URL
 - `search_type`: 搜索类型
   - `search`: 搜索引擎搜索
   - `fetch`: 抓取网页内容
@@ -236,7 +254,7 @@ Orange Agent 集成了以下工具：
   - `duckduckgo`: DuckDuckGo（推荐，免费）
   - `google`: Google（需 API Key）
   - `bing`: Bing（需 API Key）
-- `num_results`: 返回结果数量（默认5条，最多10条）
+- `num_results`: 返回结果数量（默认 5 条，最多 10 条）
 
 ### Agent 管理工具
 
@@ -260,16 +278,16 @@ VALUES ('OpenAI', 'https://api.openai.com/v1', 'sk-xxx', '["gpt-3.5-turbo", "gpt
 
 ### 模型切换
 
-每个用户可以独立选择不同的AI模型，切换记录会保存在数据库中。
+每个用户可以独立选择不同的 AI 模型，切换记录会保存在数据库中。
 
 ## 数据库表结构
 
 项目使用以下核心表：
 
 1. `users` - 用户信息
-2. `agent_configs` - AI代理配置
+2. `agent_configs` - AI 代理配置
 3. `memories` - 对话记忆
-4. `agent_call_records` - AI调用记录
+4. `agent_call_records` - AI 调用记录
 
 ## 开发指南
 
@@ -280,9 +298,9 @@ VALUES ('OpenAI', 'https://api.openai.com/v1', 'sk-xxx', '["gpt-3.5-turbo", "gpt
 3. 在 `tools/tools.go` 中注册工具
 4. 重新编译运行
 
-### 扩展AI代理
+### 扩展 AI 代理
 
-1. 在 `lanchain/base.go` 中扩展代理类型
+1. 在 `langchain/llm/` 中扩展代理类型
 2. 实现相应的配置加载逻辑
 3. 通过 `/addAgent` 命令添加新代理
 
@@ -301,18 +319,18 @@ VALUES ('OpenAI', 'https://api.openai.com/v1', 'sk-xxx', '["gpt-3.5-turbo", "gpt
 
 ### 常见问题
 
-1. **无法连接到Telegram**
+1. **无法连接到 Telegram**
 
    - 检查网络连接和代理设置
-   - 确认Bot Token是否正确
+   - 确认 Bot Token 是否正确
 2. **数据库连接失败**
 
    - 检查数据库配置
-   - 确认MySQL服务正在运行
-3. **AI调用失败**
+   - 确认 MySQL 服务正在运行
+3. **AI 调用失败**
 
-   - 检查代理配置和API密钥
-   - 确认网络可以访问AI服务
+   - 检查代理配置和 API 密钥
+   - 确认网络可以访问 AI 服务
 4. **联网搜索失败**
 
    - 检查网络连接
@@ -335,28 +353,31 @@ tail -f log/orange-agent.log
 2. 创建特性分支
 3. 提交更改
 4. 推送分支
-5. 创建Pull Request
+5. 创建 Pull Request
 
 ## 相关技术
 
 - [Go](https://golang.org/) - 编程语言 (v1.25.6)
-- [LangChain Go](https://github.com/tmc/langchaingo) - AI框架 (v0.1.14)
-- [TeleBot](https://github.com/tucnak/telebot) - Telegram Bot框架 (v3.3.8)
-- [GORM](https://gorm.io/) - ORM框架 (v1.31.1)
+- [LangChain Go](https://github.com/tmc/langchaingo) - AI 框架 (v0.1.14)
+- [TeleBot](https://github.com/tucnak/telebot) - Telegram Bot 框架 (v3.3.8)
+- [GORM](https://gorm.io/) - ORM 框架 (v1.31.1)
 - [Viper](https://github.com/spf13/viper) - 配置管理 (v1.21.0)
 
 ## 更新日志
 
-### v1.2.0 (2026-03-29)
+### v1.3.0 (2026-03-29)
 
 - ✨ **重构项目结构**：采用更清晰的模块化架构
   - 新增 `common/` 目录存放通用工具
   - 优化 `repository/` 层次结构
   - 改进 `tools/` 工具分类
-- 📝 **更新文档**：完善README内容，反映最新项目结构
+  - 完善 `langchain/` 目录结构
+- 📝 **更新文档**：修正 README 中的路径错误
+  - 修正 `lanchain/` → `langchain/`
+  - 修正 `promete/telegram.text` → `promet/telegram.md`
 - 🐛 **持续改进**：修复已知问题，提升稳定性
 
-### v1.1.0
+### v1.2.0
 
 - ✨ 新增联网搜索功能
   - 支持 DuckDuckGo、Google、Bing 搜索引擎
@@ -365,7 +386,7 @@ tail -f log/orange-agent.log
 - 🐛 修复若干已知问题
 - 📝 更新文档
 
-### v1.0.0
+### v1.1.0
 
 - 🎉 初始版本发布
 - 🤖 多 AI 代理支持
