@@ -30,6 +30,12 @@ func (t *telegram) InitTelegram(config *domain.Telegram, answer interfaces.Ansew
 	return client
 }
 
+func (t *telegram) Start() {
+	if t.client != nil {
+		t.client.Start()
+	}
+}
+
 func (t *telegram) SendTeleGramMessage(telegramId int64, text string) {
 	t.client.SendMessage(telegramId, text)
 }

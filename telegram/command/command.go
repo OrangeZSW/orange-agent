@@ -272,8 +272,8 @@ func (t *ToolsCommand) Handle(ctx context.Context, c telebot.Context, user *doma
 	return response.String()
 }
 
-// executeTool 执行工具函数
-func executeTool(toolName string, params interface{}) (string, error) {
+// ExecuteTool 执行工具函数（导出给外部包使用）
+func ExecuteTool(toolName string, params interface{}) (string, error) {
 	allTools := tools.GetTools()
 	tool, exists := allTools[toolName]
 	if !exists {
@@ -293,6 +293,11 @@ func executeTool(toolName string, params interface{}) (string, error) {
 	}
 
 	return result, nil
+}
+
+// executeTool 执行工具函数（包内使用）
+func executeTool(toolName string, params interface{}) (string, error) {
+	return ExecuteTool(toolName, params)
 }
 
 // executeDBTool 执行数据库工具函数
