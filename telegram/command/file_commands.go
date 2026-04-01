@@ -3,7 +3,6 @@ package command
 import (
 	"context"
 	"fmt"
-	"orange-agent/agent/tools/file"
 	"orange-agent/domain"
 	"strings"
 
@@ -23,7 +22,7 @@ func (f *FileListCommand) Description() string {
 
 func (f *FileListCommand) Handle(ctx context.Context, c telebot.Context, user *domain.User, args []string) string {
 	// 执行文件列表操作
-	result, err := file.FileList()
+	result, err := executeTool("file_list", map[string]interface{}{})
 	if err != nil {
 		return fmt.Sprintf("❌ 获取文件列表失败: %v", err)
 	}
@@ -66,7 +65,9 @@ func (f *FileReadCommand) Handle(ctx context.Context, c telebot.Context, user *d
 	filePath := args[0]
 	
 	// 执行文件读取操作
-	result, err := file.ReadFile(filePath)
+	result, err := executeTool("file_read", map[string]interface{}{
+		"file_path": filePath,
+	})
 	if err != nil {
 		return fmt.Sprintf("❌ 读取文件失败: %v", err)
 	}
@@ -106,7 +107,9 @@ func (f *FileSearchCommand) Handle(ctx context.Context, c telebot.Context, user 
 	searchPattern := strings.Join(args, " ")
 	
 	// 执行文件搜索操作
-	result, err := file.FileSearch(searchPattern)
+	result, err := executeTool("file_search", map[string]interface{}{
+		"pattern": searchPattern,
+	})
 	if err != nil {
 		return fmt.Sprintf("❌ 搜索文件失败: %v", err)
 	}

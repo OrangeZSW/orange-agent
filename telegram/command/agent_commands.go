@@ -3,7 +3,6 @@ package command
 import (
 	"context"
 	"fmt"
-	"orange-agent/agent/tools/agent"
 	"orange-agent/domain"
 	"strings"
 
@@ -23,7 +22,7 @@ func (a *AgentListCommand) Description() string {
 
 func (a *AgentListCommand) Handle(ctx context.Context, c telebot.Context, user *domain.User, args []string) string {
 	// 执行Agent列表操作
-	result, err := agent.AgentList()
+	result, err := executeTool("agent_list", map[string]interface{}{})
 	if err != nil {
 		return fmt.Sprintf("❌ 获取Agent列表失败: %v", err)
 	}
@@ -35,7 +34,14 @@ func (a *AgentListCommand) Handle(ctx context.Context, c telebot.Context, user *
 	if strings.TrimSpace(result) == "" {
 		response.WriteString("📭 当前没有配置任何Agent")
 	} else {
-		response.WriteString(result)
+		// 尝试解析JSON结果并美化显示
+		if strings.HasPrefix(result, "{") {
+			response.WriteString("```json\n")
+			response.WriteString(result)
+			response.WriteString("\n```")
+		} else {
+			response.WriteString(result)
+		}
 	}
 	
 	return response.String()
@@ -60,7 +66,9 @@ func (a *AgentTestCommand) Handle(ctx context.Context, c telebot.Context, user *
 	agentName := args[0]
 	
 	// 执行Agent测试操作
-	result, err := agent.AgentTest(agentName)
+	result, err := executeTool("agent_test", map[string]interface{}{
+		"name": agentName,
+	})
 	if err != nil {
 		return fmt.Sprintf("❌ 测试Agent失败: %v", err)
 	}
