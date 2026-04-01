@@ -15,6 +15,8 @@ import (
 	telebot "gopkg.in/telebot.v3"
 )
 
+const maxMessageLength = 4096 // Telegram单条消息最大长度限制
+
 // UIManager 管理Telegram用户界面交互
 type UIManager struct {
 	log           *logger.Logger
@@ -233,12 +235,45 @@ func (um *UIManager) getMenuForCommand(cmd string) *telebot.ReplyMarkup {
 	return um.menuManager.GetMainMenu()
 }
 
-// SendMessageWithMenu 发送带菜单的消息
+// SendMessageWithMenu 发送带菜单的消息（支持长消息拆分）
 func (um *UIManager) SendMessageWithMenu(c telebot.Context, text string, menu *telebot.ReplyMarkup) error {
-	if menu != nil {
-		return c.Reply(text, menu, telebot.ModeMarkdown)
+	if len(text) <= maxMessageLength {
+		if menu != nil {
+			return c.Reply(text, menu, telebot.ModeMarkdown)
+		}
+		return c.Reply(text, telebot.ModeMarkdown)
 	}
-	return c.Reply(text, telebot.ModeMarkdown)
+
+	// 拆分文本为多个块
+	var chunks []string
+	for i := 0; i < len(text); i += maxMessageLength {
+		end := i + maxMessageLength
+		if end > len(text) {
+			end = len(text)
+		}
+		chunks = append(chunks, text[i:end])
+	}
+
+	// 逐个发送消息块，最后一块带菜单
+	for i, chunk := range chunks {
+		var err error
+		if i == len(chunks)-1 {
+			// 最后一条消息带上菜单
+			if menu != nil {
+				err = c.Reply(chunk, menu, telebot.ModeMarkdown)
+			} else {
+				err = c.Reply(chunk, telebot.ModeMarkdown)
+			}
+		} else {
+			// 前面的消息只发文本
+			err = c.Reply(chunk+"\n...(下一部分)", telebot.ModeMarkdown)
+		}
+		if err != nil {
+			um.log.Error("发送带菜单的消息块失败: %v", err)
+			return err
+		}
+	}
+	return nil
 }
 
 // CleanupOldStates 清理过期的用户状态
