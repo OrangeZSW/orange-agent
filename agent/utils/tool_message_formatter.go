@@ -33,7 +33,7 @@ func (f *ToolMessageFormatter) FormatToolSuccessMessage(toolName, arguments, res
 	// 格式化结果（截断过长的结果）
 	prettyResult := f.prettifyResult(result)
 
-	return fmt.Sprintf("✅ *工具调用成功*\n\n📋 *工具名称*: %s\n⚙️ *参数*:\n%s\n📊 *输出*:\n%.50s",
+	return fmt.Sprintf("✅ *工具调用成功*\n\n📋 *工具名称*: %s\n⚙️ *参数*:\n%s`\n📊 *输出*:\n%s",
 		prettyToolName, prettyArgs, prettyResult)
 }
 
