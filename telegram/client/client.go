@@ -73,7 +73,7 @@ func (c *client) listenMessage() {
 		c.log.Info("Telegram发送消息: %s", res)
 		memory.AgentAnswer = res
 		c.repo.Memory.UpdateMemory(memory)
-		err := t.Reply(res)
+		err := t.Reply(res, telebot.ModeMarkdown)
 		if err != nil {
 			c.log.Error("发送消息失败: %v", err)
 		}
