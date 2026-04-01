@@ -1,12 +1,13 @@
 package client
 
 import (
+	"context"
 	"orange-agent/domain"
 	"orange-agent/repository"
 	"orange-agent/repository/resource"
 	"orange-agent/telegram/interfaces"
 	"orange-agent/telegram/manager"
-
+	"orange-agent/utils"
 	"orange-agent/utils/http"
 	"orange-agent/utils/logger"
 
@@ -56,6 +57,7 @@ func (c *client) Stop() {
 
 // 监听消息
 func (c *client) listenMessage() {
+	ctx := context.Background()
 	c.bot.Handle(telebot.OnText, func(t telebot.Context) error {
 		telegramId := t.Sender().ID
 		name := t.Sender().Username
@@ -64,6 +66,7 @@ func (c *client) listenMessage() {
 			UserId:       user.ID,
 			UserQuestion: t.Text(),
 		}
+		utils.WithUser(ctx, user)
 		c.repo.Memory.CreateMemory(memory)
 		c.log.Info("Telegram收到消息: %s", t.Text())
 		res := c.answer.TeleGramChat(user.ModelName, c.manager.GetMessage(user.ID, t.Text()), user)
