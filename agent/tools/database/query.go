@@ -2,15 +2,11 @@ package database
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"orange-agent/common"
-	"orange-agent/config"
+	"orange-agent/repository/resource"
 	"orange-agent/utils/logger"
-
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
 )
 
 var DatabaseQueryTool = common.BaseTool{
@@ -59,25 +55,10 @@ var DatabaseExecuteTool = common.BaseTool{
 	Call: handlerDatabaseExecute,
 }
 
-// 获取数据库连接
-func getDB() (*gorm.DB, error) {
-	cfg, err := config.GetConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get config: %v", err)
-	}
-
-	dsn := cfg.Database.Username + ":" + cfg.Database.Password + "@tcp(" + cfg.Database.Host + ":" + cfg.Database.Port + ")/" + cfg.Database.Database + "?charset=utf8mb4&parseTime=True&loc=Local"
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %v", err)
-	}
-
-	return db, nil
-}
-
 func handlerDatabaseQuery(ctx context.Context, input string) (string, error) {
 	log := logger.GetLogger()
-	
+	repo := resource.GetRepositories()
+
 	// 解析JSON参数
 	var params struct {
 		Query string   `json:"query"`
@@ -92,12 +73,6 @@ func handlerDatabaseQuery(ctx context.Context, input string) (string, error) {
 		return "", fmt.Errorf("query is required")
 	}
 
-	// 获取数据库连接
-	db, err := getDB()
-	if err != nil {
-		return "", err
-	}
-
 	// 转换参数为[]interface{}
 	args := make([]interface{}, len(params.Args))
 	for i, arg := range params.Args {
@@ -105,7 +80,7 @@ func handlerDatabaseQuery(ctx context.Context, input string) (string, error) {
 	}
 
 	// 执行查询
-	rows, err := db.Raw(params.Query, args...).Rows()
+	rows, err := repo.SqlQuery.ExecuteRows(params.Query, args...)
 	if err != nil {
 		log.Error("Database query failed: %v", err)
 		return "", fmt.Errorf("query failed: %v", err)
@@ -139,7 +114,7 @@ func handlerDatabaseQuery(ctx context.Context, input string) (string, error) {
 		rowData := make(map[string]interface{})
 		for i, col := range columns {
 			val := values[i]
-			
+
 			// 处理[]byte类型
 			if b, ok := val.([]byte); ok {
 				rowData[col] = string(b)
@@ -168,7 +143,8 @@ func handlerDatabaseQuery(ctx context.Context, input string) (string, error) {
 
 func handlerDatabaseExecute(ctx context.Context, input string) (string, error) {
 	log := logger.GetLogger()
-	
+	repo := resource.GetRepositories()
+
 	// 解析JSON参数
 	var params struct {
 		Query string   `json:"query"`
@@ -183,12 +159,6 @@ func handlerDatabaseExecute(ctx context.Context, input string) (string, error) {
 		return "", fmt.Errorf("query is required")
 	}
 
-	// 获取数据库连接
-	db, err := getDB()
-	if err != nil {
-		return "", err
-	}
-
 	// 转换参数为[]interface{}
 	args := make([]interface{}, len(params.Args))
 	for i, arg := range params.Args {
@@ -196,7 +166,7 @@ func handlerDatabaseExecute(ctx context.Context, input string) (string, error) {
 	}
 
 	// 执行SQL
-	result := db.Exec(params.Query, args...)
+	result := repo.SqlQuery.Execute(params.Query, args...)
 	if result.Error != nil {
 		log.Error("Database execute failed: %v", result.Error)
 		return "", fmt.Errorf("execute failed: %v", result.Error)
@@ -204,22 +174,15 @@ func handlerDatabaseExecute(ctx context.Context, input string) (string, error) {
 
 	// 获取影响的行数
 	rowsAffected := result.RowsAffected
-	
+
 	// 尝试获取最后插入ID（如果是INSERT操作）
 	var lastInsertId int64
-	// 注意：gorm的Exec结果不直接提供LastInsertId，我们需要使用原生数据库连接
-	sqlDB, err := db.DB()
-	if err == nil {
-		// 对于MySQL，我们可以尝试使用原生查询获取最后插入ID
-		// 但这需要在同一事务中，这里我们简单处理
-		lastInsertId = 0 // 简化处理，实际使用可能需要更复杂的逻辑
-	}
 
 	// 构建结果
 	executeResult := map[string]interface{}{
-		"rows_affected": rowsAffected,
+		"rows_affected":  rowsAffected,
 		"last_insert_id": lastInsertId,
-		"success": true,
+		"success":        true,
 	}
 
 	// 转换结果为JSON

@@ -1,7 +1,10 @@
 package repository
 
 import (
+	"database/sql"
 	"orange-agent/domain"
+
+	"gorm.io/gorm"
 )
 
 type Repositories struct {
@@ -12,6 +15,12 @@ type Repositories struct {
 	Task            TaskRepository
 	SubTask         SubTaskRepository
 	TaskResult      TaskResultRepository
+	SqlQuery        SqlQuery
+}
+
+type SqlQuery interface {
+	ExecuteRows(query string, args ...interface{}) (*sql.Rows, error)
+	Execute(query string, args ...interface{}) (tx *gorm.DB)
 }
 
 // UserRepository 用户仓储接口
