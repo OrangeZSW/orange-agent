@@ -121,7 +121,7 @@ func (wp *WorkerPool) executeSubTask(subTask *domain.SubTask) {
 		{Role: "user", Content: prompt},
 	}
 
-	response := wp.taskChat.TaskChat(wp.ctx, messages)
+	response := wp.taskChat.Chat(wp.ctx, messages)
 
 	// 添加助手响应到上下文
 	wp.contextManager.AddMessage(subTask.ID, "assistant", response, len(response))

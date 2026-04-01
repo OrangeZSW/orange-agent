@@ -62,7 +62,7 @@ func (ts *TaskSplitter) Split(ctx context.Context, task *domain.Task, analysis *
 		analysis.Constraints)
 
 	// 获取默认agent进行任务拆分
-	response := ts.taskChat.TaskChat(ctx, []domain.Message{
+	response := ts.taskChat.Chat(ctx, []domain.Message{
 		{
 			Role:    "user",
 			Content: prompt,

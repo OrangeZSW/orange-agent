@@ -50,7 +50,7 @@ func (ta *TaskAnalyzer) Analyze(ctx context.Context, taskDescription string) (*A
 
 只返回JSON，不要其他内容。`, taskDescription)
 
-	response := ta.TaskChat.TaskChat(ctx, []domain.Message{
+	response := ta.TaskChat.Chat(ctx, []domain.Message{
 		{Role: "user", Content: prompt},
 	})
 

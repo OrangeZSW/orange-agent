@@ -28,7 +28,7 @@ func (ts *TaskSummarizer) Summarize(ctx context.Context, originalTask *domain.Ta
 	prompt := ts.buildSummaryPrompt(originalTask, summary)
 
 	// 调用agent生成总结
-	response := ts.taskChat.TaskChat(ctx, []domain.Message{
+	response := ts.taskChat.Chat(ctx, []domain.Message{
 		{Role: "user", Content: prompt},
 	})
 

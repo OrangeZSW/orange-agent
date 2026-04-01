@@ -6,5 +6,5 @@ import (
 )
 
 type TaskChat interface {
-	TaskChat(ctx context.Context, messages []domain.Message) string
+	Chat(ctx context.Context, messages []domain.Message) string
 }
