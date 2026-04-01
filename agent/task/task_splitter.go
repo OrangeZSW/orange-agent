@@ -5,20 +5,19 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"orange-agent/agent/interfaces"
 	"orange-agent/domain"
 	"orange-agent/utils/logger"
 )
 
 // TaskSplitter 将总任务拆分为多个子任务
 type TaskSplitter struct {
-	agentManager interfaces.AgentManager
+	taskChat TaskChat
 }
 
 // NewTaskSplitter 创建新的任务分割器
-func NewTaskSplitter(agentManager interfaces.AgentManager) *TaskSplitter {
+func NewTaskSplitter(taskChat TaskChat) *TaskSplitter {
 	return &TaskSplitter{
-		agentManager: agentManager,
+		taskChat: taskChat,
 	}
 }
 
@@ -63,18 +62,12 @@ func (ts *TaskSplitter) Split(ctx context.Context, task *domain.Task, analysis *
 		analysis.Constraints)
 
 	// 获取默认agent进行任务拆分
-	agent, err := ts.agentManager.GetDefaultAgent()
-	if err != nil {
-		return nil, fmt.Errorf("获取默认agent失败: %w", err)
-	}
-
-	// 调用agent进行任务拆分
-	response, err := agent.Chat(ctx, []domain.Message{
-		{Role: "user", Content: prompt},
+	response := ts.taskChat.TaskChat(ctx, []domain.Message{
+		{
+			Role:    "user",
+			Content: prompt,
+		},
 	})
-	if err != nil {
-		return nil, fmt.Errorf("任务拆分失败: %w", err)
-	}
 
 	// 解析JSON响应
 	var result struct {
@@ -85,7 +78,7 @@ func (ts *TaskSplitter) Split(ctx context.Context, task *domain.Task, analysis *
 	}
 
 	// 清理响应内容，只保留JSON部分
-	jsonStr := extractJSON(response.Content)
+	jsonStr := extractJSON(response)
 	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
 		return nil, fmt.Errorf("解析拆分结果失败: %w", err)
 	}

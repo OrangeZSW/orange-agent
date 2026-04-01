@@ -66,10 +66,10 @@ func (c *client) listenMessage() {
 			UserId:       user.ID,
 			UserQuestion: t.Text(),
 		}
-		utils.WithUser(ctx, user)
+		ctx = utils.WithUser(ctx, user)
 		c.repo.Memory.CreateMemory(memory)
 		c.log.Info("Telegram收到消息: %s", t.Text())
-		res := c.answer.TeleGramChat(user.ModelName, c.manager.GetMessage(user.ID, t.Text()), user)
+		res := c.answer.TeleGramChat(ctx, user.ModelName, c.manager.GetMessage(user.ID, t.Text()))
 		c.log.Info("Telegram发送消息: %s", res)
 		memory.AgentAnswer = res
 		c.repo.Memory.UpdateMemory(memory)

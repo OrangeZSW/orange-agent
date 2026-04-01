@@ -1,6 +1,7 @@
 package interfaces
 
 import (
+	"context"
 	"orange-agent/domain"
 
 	"github.com/tmc/langchaingo/llms"
@@ -23,5 +24,5 @@ type Client interface {
 }
 
 type Ansewer interface {
-	TeleGramChat(modelNmae string, message []llms.MessageContent, user *domain.User) string
+	TeleGramChat(ctx context.Context, modelNmae string, message []llms.MessageContent) string
 }

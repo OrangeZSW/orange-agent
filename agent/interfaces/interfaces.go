@@ -12,8 +12,8 @@ type Client interface {
 }
 
 type Agent interface {
-	TeleGramChat(modelNmae string, message []llms.MessageContent, user *domain.User) string
-	Chat(ctx context.Context, messages []domain.Message) (*domain.Message, error)
+	TeleGramChat(ctx context.Context, modelNmae string, message []llms.MessageContent) string
+	Chat(ctx context.Context, messages []domain.Message) string
 }
 
 type Manager interface {

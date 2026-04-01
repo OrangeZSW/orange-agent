@@ -9,6 +9,7 @@ import (
 	"orange-agent/repository"
 	"orange-agent/repository/resource"
 	"orange-agent/utils"
+	"orange-agent/utils/logger"
 	"sync"
 
 	"github.com/tmc/langchaingo/llms"
@@ -22,25 +23,40 @@ var (
 type agent struct {
 	repo     *repository.Repositories
 	Telegram interfaces.Telegram
+	log      *logger.Logger
 }
 
 func NewAgent() interfaces.Agent {
 	once.Do(func() {
 		Agent = &agent{
 			repo: resource.GetRepositories(),
+			log:  logger.GetLogger(),
 		}
 	})
 	return Agent
 }
 
-func (a *agent) TeleGramChat(modelName string, message []llms.MessageContent, user *domain.User) string {
+func (a *agent) TeleGramChat(ctx context.Context, modelName string, message []llms.MessageContent) string {
 	// agent
-	agent := client.NewClient(manager.NewManager(user))
-	res := agent.Chat(modelName, message)
+	user, ok := utils.GetUserFromContext(ctx)
+	if user == nil || !ok {
+		a.log.Error("get user from context error")
+		return "get user from context error"
+	}
+	client := client.NewClient(manager.NewManager(user))
+	res := ""
+	switch user.ChainMode {
+	case domain.NORMAL:
+		res = client.Chat(modelName, message)
+	case domain.TASK:
+		res = TaskChat()
+	default:
+		res = client.Chat(modelName, message)
+	}
 	return res
 }
 
-func (a *agent) Chat(ctx context.Context, messages []domain.Message) (*domain.Message, error) {
+func (a *agent) Chat(ctx context.Context, messages []domain.Message) string {
 	// 转换domain.Message为langchaingo的MessageContent
 	var llmMessages []llms.MessageContent
 	for _, msg := range messages {
@@ -59,20 +75,19 @@ func (a *agent) Chat(ctx context.Context, messages []domain.Message) (*domain.Me
 	}
 
 	// 从上下文中获取用户信息
-	user := utils.GetUserFromContextOrDefault(ctx)
-
-	// 获取默认agent配置
-	agentConfig, err := a.repo.AgentConfig.GetAgentConfigByName("default")
-	if err != nil {
-		return nil, err
+	user, falg := utils.GetUserFromContext(ctx)
+	if !falg && user == nil {
+		a.log.Error("get user from context error")
+		return "get user from context error"
 	}
 
 	// 使用现有client进行聊天
 	agentClient := client.NewClient(manager.NewManager(user))
-	result := agentClient.Chat(agentConfig.Name, llmMessages)
+	result := agentClient.Chat(user.ModelName, llmMessages)
 
-	return &domain.Message{
-		Role:    "assistant",
-		Content: result,
-	}, nil
+	return result
+}
+
+func TaskChat() string {
+	return ""
 }
