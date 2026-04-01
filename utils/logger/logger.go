@@ -146,6 +146,8 @@ func (l *Logger) log(level LogLevel, format string, args ...interface{}) {
 	if level < l.level {
 		return
 	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
 
 	//判断日志是否需要轮转
 	if time.Now().Format("2006-01-02") != l.GetLastModifiedTime() {
@@ -257,18 +259,16 @@ func (l *Logger) Rotate() error {
 	if l.file == nil {
 		return nil
 	}
-
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
+	old := l.GetLastModifiedTime()
 	// 关闭当前文件
 	if err := l.file.Close(); err != nil {
 		return err
 	}
 
+	fmt.Printf("time:%s", old)
 	// 重命名旧文件 app-2024-06-01.log
 	oldPath := l.file.Name()
-	newPath := fmt.Sprintf("%s-%s.log", strings.TrimSuffix(oldPath, ".log"), l.GetLastModifiedTime())
+	newPath := fmt.Sprintf("%s-%s.log", strings.TrimSuffix(oldPath, ".log"), old)
 	if err := os.Rename(oldPath, newPath); err != nil {
 		return err
 	}

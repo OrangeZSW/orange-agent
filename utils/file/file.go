@@ -149,3 +149,32 @@ func GetFileTree(rootPath string) ([]*common.FileNode, error) {
 
 	return result, nil
 }
+
+func GetFileList(rootPath string) ([]common.FileInfo, error) {
+	res := []common.FileInfo{}
+
+	files, err := os.ReadDir(rootPath)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, item := range files {
+		fullPath := filepath.Join(rootPath, item.Name())
+
+		if item.IsDir() {
+			// 递归获取子目录中的文件
+			children, err := GetFileList(fullPath)
+			if err != nil {
+				continue // 跳过无法读取的目录
+			}
+			res = append(res, children...)
+		} else {
+			// 只添加文件，不添加目录
+			res = append(res, common.FileInfo{
+				Name: item.Name(),
+				Path: fullPath,
+			})
+		}
+	}
+	return res, nil
+}

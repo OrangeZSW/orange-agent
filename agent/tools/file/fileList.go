@@ -9,7 +9,7 @@ import (
 
 var FileListTool = common.BaseTool{
 	Name:        "file_list",
-	Description: "list all files in the current directory",
+	Description: "list all files in the current directory,root path is ./",
 	Call:        handlerFileList,
 	Parameters: map[string]interface{}{
 		"type":       "object",
