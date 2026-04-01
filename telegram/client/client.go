@@ -60,9 +60,16 @@ func (c *client) listenMessage() {
 		telegramId := t.Sender().ID
 		name := t.Sender().Username
 		user := c.manager.GetUser(telegramId, name)
+		memory := &domain.Memory{
+			UserId:       user.ID,
+			UserQuestion: t.Text(),
+		}
+		c.repo.Memory.CreateMemory(memory)
 		c.log.Info("Telegram收到消息: %s", t.Text())
 		res := c.answer.TeleGramChat(user.ModelName, c.manager.GetMessage(user.ID, t.Text()), user)
 		c.log.Info("Telegram发送消息: %s", res)
+		memory.AgentAnswer = res
+		c.repo.Memory.UpdateMemory(memory)
 		err := t.Reply(res)
 		if err != nil {
 			c.log.Error("发送消息失败: %v", err)
@@ -70,6 +77,7 @@ func (c *client) listenMessage() {
 		return nil
 	})
 }
+
 func (c *client) SendMessage(telegramId int64, text string) {
 	c.log.Info("发送消息,userid:%d", telegramId)
 	recipient := &telebot.User{

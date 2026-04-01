@@ -294,10 +294,6 @@ func (l *Logger) GetLastModifiedTime() string {
 	if l.file == nil {
 		return ""
 	}
-
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
 	fileInfo, err := l.file.Stat()
 	if err != nil {
 		return ""

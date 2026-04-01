@@ -15,24 +15,24 @@ type manager struct {
 	User     *domain.User
 	log      *logger.Logger
 	repo     *repository.Repositories
-	memory   *domain.Memory
 	telegram interfaces.Telegram
 }
 
-func NewManager(user *domain.User, memory *domain.Memory) interfaces.Manager {
+func NewManager(user *domain.User) interfaces.Manager {
 	return &manager{
 		log:      logger.GetLogger(),
 		repo:     resource.GetRepositories(),
 		User:     user,
-		memory:   memory,
 		telegram: telegram.GetTelegram(),
 	}
 }
 
 func (r *manager) SaveCallRecord(message []llms.MessageContent, resp *llms.ContentResponse, agentConfig *domain.AgentConfig) error {
+	memory, _ := r.repo.Memory.GetMemoryByUserIdAndLimit(r.User.ID, 1)
+
 	//获取当前用户问题
 	callRecord := &domain.CallRecord{
-		MemoryId:         r.memory.ID,
+		MemoryId:         memory[0].ID,
 		UserID:           r.User.ID,
 		AgentId:          agentConfig.ID,
 		ModelName:        agentConfig.Name,

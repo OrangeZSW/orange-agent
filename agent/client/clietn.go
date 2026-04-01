@@ -36,6 +36,7 @@ func (c *client) getLLM(modelName string) {
 	if err != nil {
 		c.log.Error("获取模型配置失败: %v", err)
 	}
+	c.log.Info("provider:[%-10s] model:[%-10s]", config.Name, modelName)
 	llm, err := openai.New(
 		openai.WithToken(config.Token),
 		openai.WithBaseURL(config.BaseUrl),
