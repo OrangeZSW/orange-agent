@@ -16,7 +16,8 @@ func NewSqlQueryRepository(db *gorm.DB) repository.SqlQuery {
 }
 
 func (r *sqlQueryRepository) ExecuteRows(query string, args ...interface{}) (*sql.Rows, error) {
-	rows, err := r.db.Exec(query, args...).Rows()
+	// 修复：查询操作应该使用Raw而不是Exec
+	rows, err := r.db.Raw(query, args...).Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -24,6 +25,7 @@ func (r *sqlQueryRepository) ExecuteRows(query string, args ...interface{}) (*sq
 }
 
 func (r *sqlQueryRepository) Execute(query string, args ...interface{}) (tx *gorm.DB) {
-	return r.db.Raw(query, args...)
+	// 修复：写操作应该使用Exec而不是Raw
+	return r.db.Exec(query, args...)
 
 }

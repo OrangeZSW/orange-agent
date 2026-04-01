@@ -8,6 +8,7 @@ import (
 	"orange-agent/domain"
 	"orange-agent/repository"
 	"orange-agent/utils/logger"
+	"strconv"
 	"strings"
 
 	"gopkg.in/telebot.v3"
@@ -302,9 +303,26 @@ func executeTool(toolName string, params interface{}) (string, error) {
 
 // executeDBTool 执行数据库工具函数
 func executeDBTool(query string, args []interface{}) (string, error) {
+	// 转换所有参数为字符串类型，适配工具参数要求
+	stringArgs := make([]string, len(args))
+	for i, arg := range args {
+		switch v := arg.(type) {
+		case string:
+			stringArgs[i] = v
+		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+			stringArgs[i] = fmt.Sprintf("%d", v)
+		case float32, float64:
+			stringArgs[i] = fmt.Sprintf("%f", v)
+		case bool:
+			stringArgs[i] = strconv.FormatBool(v)
+		default:
+			stringArgs[i] = fmt.Sprintf("%v", v)
+		}
+	}
+
 	params := map[string]interface{}{
 		"query": query,
-		"args":  args,
+		"args":  stringArgs,
 	}
 
 	// 判断是查询还是执行操作
@@ -314,6 +332,7 @@ func executeDBTool(query string, args []interface{}) (string, error) {
 		strings.HasPrefix(strings.ToUpper(query), "DELETE") {
 		toolName = "database_execute"
 	}
+	logger.GetLogger().Info("执行工具:%s，参数:%s", toolName, params)
 
 	return executeTool(toolName, params)
 }

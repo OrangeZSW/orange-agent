@@ -59,6 +59,11 @@ func handlerDatabaseQuery(ctx context.Context, input string) (string, error) {
 	log := logger.GetLogger()
 	repo := resource.GetRepositories()
 
+	// 修复：检查数据库实例是否初始化，避免空指针panic
+	if repo == nil || repo.SqlQuery == nil {
+		return "", fmt.Errorf("database repository not initialized")
+	}
+
 	// 解析JSON参数
 	var params struct {
 		Query string   `json:"query"`
@@ -145,6 +150,11 @@ func handlerDatabaseExecute(ctx context.Context, input string) (string, error) {
 	log := logger.GetLogger()
 	repo := resource.GetRepositories()
 
+	// 修复：检查数据库实例是否初始化，避免空指针panic
+	if repo == nil || repo.SqlQuery == nil {
+		return "", fmt.Errorf("database repository not initialized")
+	}
+
 	// 解析JSON参数
 	var params struct {
 		Query string   `json:"query"`
@@ -167,6 +177,10 @@ func handlerDatabaseExecute(ctx context.Context, input string) (string, error) {
 
 	// 执行SQL
 	result := repo.SqlQuery.Execute(params.Query, args...)
+	// 修复：检查返回结果是否为空
+	if result == nil {
+		return "", fmt.Errorf("execute returned nil result")
+	}
 	if result.Error != nil {
 		log.Error("Database execute failed: %v", result.Error)
 		return "", fmt.Errorf("execute failed: %v", result.Error)
@@ -177,6 +191,12 @@ func handlerDatabaseExecute(ctx context.Context, input string) (string, error) {
 
 	// 尝试获取最后插入ID（如果是INSERT操作）
 	var lastInsertId int64
+	// 可选：如果result支持LastInsertId方法则添加调用
+	// lastInsertId, err = result.LastInsertId()
+	// if err != nil {
+	//     log.Debug("Failed to get last insert id: %v", err)
+	//     lastInsertId = 0
+	// }
 
 	// 构建结果
 	executeResult := map[string]interface{}{

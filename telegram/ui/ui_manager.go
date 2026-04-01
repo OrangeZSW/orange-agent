@@ -166,6 +166,16 @@ func (um *UIManager) HandleCallback(ctx context.Context, c telebot.Context, user
 			// 返回参数提示
 			prompt := um.menuManager.GetPromptMessage(cmd)
 			return prompt, nil, nil
+		} else if cmd == "modelset" && len(args) == 1 {
+			// 模型切换命令，直接执行
+			fullCmd := fmt.Sprintf("/%s %s", cmd, args[0])
+			result := um.cm.Execute(ctx, c, user, fullCmd)
+			state.LastResponse = result
+			state.LastCommand = fullCmd
+			um.UpdateUserState(userID, state)
+			
+			// 返回切换结果和模型菜单
+			return result, um.menuManager.GetModelMenu(), nil
 		}
 	}
 	

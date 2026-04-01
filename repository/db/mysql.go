@@ -55,5 +55,6 @@ func (m *Mysql) InitRepo() (*repository.Repositories, error) {
 		AgentConfig:     mysql_gorm.NewAgentConfigRepository(m.db),
 		Memory:          mysql_gorm.NewMemoryRepository(m.db),
 		AgentCallRecord: mysql_gorm.NewAgentCallRecordRepository(m.db),
+		SqlQuery:        mysql_gorm.NewSqlQueryRepository(m.db),
 	}, nil
 }

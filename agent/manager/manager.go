@@ -35,7 +35,7 @@ func (r *manager) SaveCallRecord(message []llms.MessageContent, resp *llms.Conte
 		MemoryId:         memory[0].ID,
 		UserID:           r.User.ID,
 		AgentId:          agentConfig.ID,
-		ModelName:        agentConfig.Name,
+		ModelName:        r.User.ModelName,
 		PromptTokens:     resp.Choices[0].GenerationInfo["PromptTokens"].(int),
 		CompletionTokens: resp.Choices[0].GenerationInfo["CompletionTokens"].(int),
 		TotalTokens:      resp.Choices[0].GenerationInfo["TotalTokens"].(int),
