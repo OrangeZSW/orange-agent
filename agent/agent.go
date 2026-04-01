@@ -14,6 +14,7 @@ import (
 	"orange-agent/utils/logger"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/tmc/langchaingo/llms"
 )
 
@@ -51,7 +52,7 @@ func (a *agent) TeleGramChat(ctx context.Context, modelName string, message []ll
 	case domain.NORMAL:
 		res = client.Chat(modelName, message)
 	case domain.TASK:
-		res = TaskChat()
+		res = a.TaskChat(ctx, GetQuestionFromMessage(message))
 	default:
 		res = client.Chat(modelName, message)
 	}
@@ -90,28 +91,42 @@ func (a *agent) Chat(ctx context.Context, messages []domain.Message) string {
 	return result
 }
 
-func (a *agent) TaskChat(ctx context.Context) string {
+func (a *agent) TaskChat(ctx context.Context, question string) string {
 	config := task.DefaultOrchestratorConfig()
 	config.WorkerCount = 3 // 设置3个worker并发执行
 	orchestrator := task.NewTaskOrchestrator(config, a)
 
 	// 3. 创建总任务
 	task := &domain.Task{
-		SessionID:   "example-session-001",
-		Description: "开发一个简单的待办事项应用，需要包含以下功能：\n1. 用户可以添加待办事项\n2. 用户可以标记待办事项为完成\n3. 用户可以删除待办事项\n4. 提供简单的Web界面",
+		SessionID:   uuid.NewString(),
+		Description: question,
 		Status:      domain.StatusPending,
 	}
 
 	// 4. 执行任务
-	ctx := context.Background()
 	result, err := orchestrator.Execute(ctx, task)
 	if err != nil {
 		fmt.Printf("任务执行失败: %v\n", err)
-		return
+		return fmt.Sprintf("任务执行失败%s", err)
 	}
 
-	// 5. 输出结果
-	fmt.Println("任务执行完成！")
-	fmt.Println("最终结果：")
-	fmt.Println(result)
+	return result
+}
+
+func GetQuestionFromMessage(message []llms.MessageContent) string {
+	if len(message) == 0 {
+		return ""
+	}
+
+	lastMsg := message[len(message)-1]
+	if len(lastMsg.Parts) == 0 {
+		return ""
+	}
+
+	// 直接断言为 TextContent 并获取 Text 字段
+	if textContent, ok := lastMsg.Parts[0].(llms.TextContent); ok {
+		return textContent.Text
+	}
+
+	return ""
 }

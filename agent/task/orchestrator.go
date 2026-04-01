@@ -59,6 +59,9 @@ func NewTaskOrchestrator(config *OrchestratorConfig, taskChat TaskChat) *TaskOrc
 func (to *TaskOrchestrator) Execute(ctx context.Context, task *domain.Task) (string, error) {
 	logger.Info("开始执行任务编排流程")
 
+	// 重新创建 worker pool，传入 ctx
+	to.workerPool = NewWorkerPoolWithCtx(ctx, to.workerPool.workerCount, to.taskQueue, to.contextManager, to.workerPool.taskChat)
+
 	// 1. 分析任务
 	analysis, err := to.taskAnalyzer.Analyze(ctx, task.Description)
 	if err != nil {

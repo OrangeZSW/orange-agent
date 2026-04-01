@@ -41,6 +41,26 @@ func NewWorkerPool(
 	}
 }
 
+// NewWorkerPoolWithCtx 创建新的工作池，并传入父 context
+func NewWorkerPoolWithCtx(
+	parentCtx context.Context,
+	workerCount int,
+	taskQueue *TaskQueue,
+	contextManager *ContextManager,
+	taskChat TaskChat,
+) *WorkerPool {
+	ctx, cancel := context.WithCancel(parentCtx)
+	return &WorkerPool{
+		workerCount:    workerCount,
+		taskQueue:      taskQueue,
+		contextManager: contextManager,
+		resultChan:     make(chan *domain.SubTask, 100),
+		ctx:            ctx,
+		cancel:         cancel,
+		taskChat:       taskChat,
+	}
+}
+
 // Start 启动工作池
 func (wp *WorkerPool) Start() {
 	logger.Info("启动工作池，Worker数量: %d", wp.workerCount)
