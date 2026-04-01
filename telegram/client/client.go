@@ -233,9 +233,9 @@ func (c *client) SendMessage(telegramId int64, text string) {
 	recipient := &telebot.User{
 		ID: telegramId,
 	}
-	
+
 	if len(text) <= maxMessageLength {
-		_, err := c.bot.Send(recipient, text)
+		_, err := c.bot.Send(recipient, text, telebot.ModeMarkdown)
 		if err != nil {
 			c.log.Error("发送消息失败: %v", err)
 		}
@@ -258,7 +258,7 @@ func (c *client) SendMessage(telegramId int64, text string) {
 		if i != len(chunks)-1 {
 			sendText += "\n...(下一部分)"
 		}
-		_, err := c.bot.Send(recipient, sendText)
+		_, err := c.bot.Send(recipient, sendText, telebot.ModeMarkdown)
 		if err != nil {
 			c.log.Error("发送消息块失败: %v", err)
 			return

@@ -19,7 +19,7 @@ func (f *ToolMessageFormatter) FormatToolCallMessage(toolName, arguments string)
 	// 格式化参数
 	prettyArgs := f.prettifyArguments(arguments)
 
-	return fmt.Sprintf("🛠️ *工具调用*\n\n📋 *工具名称*: %s\n⚙️ *参数*:\n%s", prettyToolName, prettyArgs)
+	return fmt.Sprintf("🛠️ 工具调用\n\n📋 工具名称: %s\n⚙️ 参数:\n%s", prettyToolName, prettyArgs)
 }
 
 // FormatToolSuccessMessage 格式化工具调用成功消息
@@ -33,7 +33,7 @@ func (f *ToolMessageFormatter) FormatToolSuccessMessage(toolName, arguments, res
 	// 格式化结果（截断过长的结果）
 	prettyResult := f.prettifyResult(result)
 
-	return fmt.Sprintf("✅ *工具调用成功*\n\n📋 *工具名称*: %s\n⚙️ *参数*:\n%s`\n📊 *输出*:\n%s",
+	return fmt.Sprintf("✅ 工具调用成功\n\n📋 工具名称: %s\n⚙️ 参数:\n%s\n📊 输出:\n%s",
 		prettyToolName, prettyArgs, prettyResult)
 }
 
@@ -45,7 +45,7 @@ func (f *ToolMessageFormatter) FormatToolErrorMessage(toolName, arguments, error
 	// 格式化参数
 	prettyArgs := f.prettifyArguments(arguments)
 
-	return fmt.Sprintf("❌ *工具调用失败*\n\n📋 *工具名称*: %s\n⚙️ *参数*:\n%s\n💥 *错误*:\n%s",
+	return fmt.Sprintf("❌ 工具调用失败\n\n📋 工具名称: %s\n⚙️ 参数:\n%s\n💥 错误:\n%s",
 		prettyToolName, prettyArgs, error)
 }
 
