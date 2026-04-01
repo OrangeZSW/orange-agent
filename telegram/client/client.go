@@ -70,8 +70,6 @@ func (c *client) Stop() {
 
 // 监听消息
 func (c *client) listenMessage() {
-	ctx := context.Background()
-
 	// 处理所有文本消息
 	c.bot.Handle(telebot.OnText, func(t telebot.Context) error {
 		telegramId := t.Sender().ID
@@ -80,6 +78,9 @@ func (c *client) listenMessage() {
 		messageText := t.Text()
 
 		c.log.Info("Telegram收到消息: %s, 用户: %d", messageText, telegramId)
+
+		// 先将用户信息存入上下文，再传给后续处理
+		ctx := utils.WithUser(context.Background(), user)
 
 		// 使用UI管理器处理消息
 		result, menu, err := c.ui.HandleMessage(ctx, t, user, messageText)
@@ -94,7 +95,6 @@ func (c *client) listenMessage() {
 			UserQuestion: messageText,
 			AgentAnswer:  result,
 		}
-		ctx = utils.WithUser(ctx, user)
 		c.repo.Memory.CreateMemory(memory)
 
 		// 发送响应
@@ -117,6 +117,9 @@ func (c *client) listenMessage() {
 
 		c.log.Info("Telegram收到按钮回调: %s, 用户: %d", data, telegramId)
 
+		// 先将用户信息存入上下文，再传给后续处理
+		ctx := utils.WithUser(context.Background(), user)
+
 		// 使用UI管理器处理回调
 		result, menu, err := c.ui.HandleCallback(ctx, t, user, data)
 		if err != nil {
@@ -132,7 +135,6 @@ func (c *client) listenMessage() {
 			UserQuestion: fmt.Sprintf("[按钮] %s", data),
 			AgentAnswer:  result,
 		}
-		ctx = utils.WithUser(ctx, user)
 		c.repo.Memory.CreateMemory(memory)
 		c.repo.Memory.UpdateMemory(memory)
 
@@ -174,8 +176,9 @@ func (c *client) listenMessage() {
 		telegramId := t.Sender().ID
 		name := t.Sender().Username
 		user := c.manager.GetUser(telegramId, name)
+		ctx := utils.WithUser(context.Background(), user)
 
-		result := c.cmds.Execute(context.Background(), t, user, "/help")
+		result := c.cmds.Execute(ctx, t, user, "/help")
 
 		// 返回结果和主菜单
 		menu := c.ui.GetMenuManager() // 使用公共方法获取菜单
@@ -184,13 +187,15 @@ func (c *client) listenMessage() {
 
 	// 添加快捷命令的别名处理
 	c.bot.Handle("/list", func(t telebot.Context) error {
-		result := c.cmds.Execute(context.Background(), t, nil, "/list")
+		ctx := context.Background()
+		result := c.cmds.Execute(ctx, t, nil, "/list")
 		menu := c.ui.GetFileMenu() // 使用公共方法获取文件菜单
 		return t.Reply(result, menu, telebot.ModeMarkdown)
 	})
 
 	c.bot.Handle("/status", func(t telebot.Context) error {
-		result := c.cmds.Execute(context.Background(), t, nil, "/status")
+		ctx := context.Background()
+		result := c.cmds.Execute(ctx, t, nil, "/status")
 		menu := c.ui.GetMenuManager() // 使用公共方法获取菜单
 		return t.Reply(result, menu, telebot.ModeMarkdown)
 	})
