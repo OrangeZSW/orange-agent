@@ -37,9 +37,12 @@ type Logger struct {
 	mu         sync.Mutex
 	module     string
 	showCaller bool
-}
 
-// Config 日志配置
+	// 配置信息存储在实例中
+	outputType string
+	filePath   string
+	fileName   string
+}
 
 var (
 	defaultLogger *Logger
@@ -51,7 +54,12 @@ func NewLogger(config domain.Logger) (*Logger, error) {
 	logger := &Logger{
 		module:     config.Module,
 		showCaller: config.ShowCaller,
+		// 保存配置到实例
+		outputType: config.Output,
+		filePath:   config.FilePath,
+		fileName:   config.FileName,
 	}
+
 	// 设置日志级别
 	switch strings.ToLower(config.Level) {
 	case "debug":
@@ -85,13 +93,13 @@ func NewLogger(config domain.Logger) (*Logger, error) {
 
 		// 创建日志目录
 		if err := os.MkdirAll(config.FilePath, 0755); err != nil {
-			return nil, fmt.Errorf("创建日志目录失败: %v", err)
+			return nil, fmt.Errorf("创建日志目录失败：%v", err)
 		}
 
 		filePath := filepath.Join(config.FilePath, config.FileName)
 		file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
-			return nil, fmt.Errorf("打开日志文件失败: %v", err)
+			return nil, fmt.Errorf("打开日志文件失败：%v", err)
 		}
 
 		logger.file = file
@@ -120,7 +128,6 @@ func InitDefaultLogger(config domain.Logger) error {
 // GetLogger 获取默认日志记录器
 func GetLogger() *Logger {
 	if defaultLogger == nil {
-		// 使用默认配置
 		config := domain.Logger{
 			Level:  "info",
 			Output: "console",
@@ -138,6 +145,24 @@ func (l *Logger) WithModule(module string) *Logger {
 		file:       l.file,
 		module:     module,
 		showCaller: l.showCaller,
+		// 复制配置信息
+		outputType: l.outputType,
+		filePath:   l.filePath,
+		fileName:   l.fileName,
+	}
+}
+
+// rebuildOutput 轮转后重建 output
+func (l *Logger) rebuildOutput() {
+	// 现在 output 主要用于兼容，实际输出在 log() 中分别处理
+	if l.outputType == "console" {
+		l.output = os.Stdout
+	} else if l.outputType == "file" && l.file != nil {
+		l.output = l.file
+	} else if l.outputType == "both" && l.file != nil {
+		l.output = io.MultiWriter(os.Stdout, l.file)
+	} else {
+		l.output = os.Stdout
 	}
 }
 
@@ -149,10 +174,12 @@ func (l *Logger) log(level LogLevel, format string, args ...interface{}) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	//判断日志是否需要轮转
-	if time.Now().Format("2006-01-02") != l.GetLastModifiedTime() {
-		if err := l.Rotate(); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to rotate log file: %v\n", err)
+	// 只有配置了文件输出才需要轮转
+	if l.file != nil {
+		if time.Now().Format("2006-01-02") != l.GetLastModifiedTime() {
+			if err := l.Rotate(); err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to rotate log file: %v\n", err)
+			}
 		}
 	}
 
@@ -172,7 +199,6 @@ func (l *Logger) log(level LogLevel, format string, args ...interface{}) {
 	if l.showCaller {
 		_, file, line, ok := runtime.Caller(2)
 		if ok {
-			// 只显示文件名，不显示完整路径
 			shortFile := filepath.Base(file)
 			prefix += fmt.Sprintf(" [%10s:%-3d]", shortFile, line)
 		}
@@ -181,17 +207,21 @@ func (l *Logger) log(level LogLevel, format string, args ...interface{}) {
 	// 构建完整日志消息
 	message := fmt.Sprintf(format, args...)
 
-	logLine := fmt.Sprintf("%s %s\n", prefix, message)
-
-	// 添加颜色（仅控制台输出）
-	if l.output == os.Stdout || l.output == os.Stderr {
-		logLine = fmt.Sprintf("%s%s%s %s\n", levelColor, prefix, resetColor, message)
+	// 控制台输出（带颜色）
+	if l.outputType == "console" || l.outputType == "both" {
+		consoleLine := fmt.Sprintf("%s%s%s %s\n", levelColor, prefix, resetColor, message)
+		fmt.Fprint(os.Stdout, consoleLine)
 	}
 
-	// 写入日志
-	fmt.Fprint(l.output, logLine)
+	// 文件输出（不带颜色）
+	if l.outputType == "file" || l.outputType == "both" {
+		if l.file != nil {
+			fileLine := fmt.Sprintf("%s %s\n", prefix, message)
+			fmt.Fprint(l.file, fileLine)
+		}
+	}
 
-	// 如果是FATAL级别，退出程序
+	// 如果是 FATAL 级别，退出程序
 	if level == FATAL {
 		os.Exit(1)
 	}
@@ -259,17 +289,27 @@ func (l *Logger) Rotate() error {
 	if l.file == nil {
 		return nil
 	}
+
 	old := l.GetLastModifiedTime()
+	// 如果获取不到时间，不轮转
+	if old == "" {
+		return nil
+	}
+
+	oldPath := l.file.Name()
+
 	// 关闭当前文件
 	if err := l.file.Close(); err != nil {
 		return err
 	}
 
-	fmt.Printf("time:%s", old)
-	// 重命名旧文件 app-2024-06-01.log
-	oldPath := l.file.Name()
-	newPath := fmt.Sprintf("%s-%s.log", strings.TrimSuffix(oldPath, ".log"), old)
+	// 重命名旧文件
+	baseName := strings.TrimSuffix(oldPath, ".log")
+	newPath := fmt.Sprintf("%s-%s.log", baseName, old)
+
 	if err := os.Rename(oldPath, newPath); err != nil {
+		// 重命名失败尝试重新打开原文件，避免日志丢失
+		l.file, _ = os.OpenFile(oldPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		return err
 	}
 
@@ -283,8 +323,10 @@ func (l *Logger) Rotate() error {
 	if err != nil {
 		return err
 	}
-
 	l.file = file
+
+	// 轮转后重建 output 写入器
+	l.rebuildOutput()
 
 	return nil
 }
