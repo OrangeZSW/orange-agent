@@ -15,10 +15,10 @@ func NewToolMessageFormatter() *ToolMessageFormatter {
 func (f *ToolMessageFormatter) FormatToolCallMessage(toolName, arguments string) string {
 	// 美化工具名
 	prettyToolName := f.prettifyToolName(toolName)
-	
+
 	// 格式化参数
 	prettyArgs := f.prettifyArguments(arguments)
-	
+
 	return fmt.Sprintf("🛠️ *工具调用*\n\n📋 *工具名称*: %s\n⚙️ *参数*:\n%s", prettyToolName, prettyArgs)
 }
 
@@ -26,14 +26,14 @@ func (f *ToolMessageFormatter) FormatToolCallMessage(toolName, arguments string)
 func (f *ToolMessageFormatter) FormatToolSuccessMessage(toolName, arguments, result string) string {
 	// 美化工具名
 	prettyToolName := f.prettifyToolName(toolName)
-	
+
 	// 格式化参数
 	prettyArgs := f.prettifyArguments(arguments)
-	
+
 	// 格式化结果（截断过长的结果）
 	prettyResult := f.prettifyResult(result)
-	
-	return fmt.Sprintf("✅ *工具调用成功*\n\n📋 *工具名称*: %s\n⚙️ *参数*:\n%s\n📊 *输出*:\n%s", 
+
+	return fmt.Sprintf("✅ *工具调用成功*\n\n📋 *工具名称*: %s\n⚙️ *参数*:\n%s\n📊 *输出*:\n%.50s",
 		prettyToolName, prettyArgs, prettyResult)
 }
 
@@ -41,11 +41,11 @@ func (f *ToolMessageFormatter) FormatToolSuccessMessage(toolName, arguments, res
 func (f *ToolMessageFormatter) FormatToolErrorMessage(toolName, arguments, error string) string {
 	// 美化工具名
 	prettyToolName := f.prettifyToolName(toolName)
-	
+
 	// 格式化参数
 	prettyArgs := f.prettifyArguments(arguments)
-	
-	return fmt.Sprintf("❌ *工具调用失败*\n\n📋 *工具名称*: %s\n⚙️ *参数*:\n%s\n💥 *错误*:\n%s", 
+
+	return fmt.Sprintf("❌ *工具调用失败*\n\n📋 *工具名称*: %s\n⚙️ *参数*:\n%s\n💥 *错误*:\n%s",
 		prettyToolName, prettyArgs, error)
 }
 
@@ -66,12 +66,12 @@ func (f *ToolMessageFormatter) prettifyArguments(args string) string {
 	if args == "" || args == "{}" {
 		return "`无参数`"
 	}
-	
+
 	// 格式化JSON参数
 	formatted := strings.ReplaceAll(args, ",", ",\n")
 	formatted = strings.ReplaceAll(formatted, "{", "{\n")
 	formatted = strings.ReplaceAll(formatted, "}", "\n}")
-	
+
 	// 添加代码块标记
 	return fmt.Sprintf("```json\n%s\n```", formatted)
 }
@@ -81,7 +81,7 @@ func (f *ToolMessageFormatter) prettifyResult(result string) string {
 	if result == "" {
 		return "`无输出`"
 	}
-	
+
 	// 如果结果太长，截断并添加省略号
 	maxLength := 500
 	if len(result) > maxLength {
@@ -95,15 +95,15 @@ func (f *ToolMessageFormatter) prettifyResult(result string) string {
 		}
 		return fmt.Sprintf("```\n%s\n```", truncated)
 	}
-	
+
 	// 尝试判断是否是JSON格式
-	if strings.HasPrefix(strings.TrimSpace(result), "{") || 
-	   strings.HasPrefix(strings.TrimSpace(result), "[") {
+	if strings.HasPrefix(strings.TrimSpace(result), "{") ||
+		strings.HasPrefix(strings.TrimSpace(result), "[") {
 		// 尝试格式化JSON
 		result = strings.ReplaceAll(result, "\\n", "\n")
 		result = strings.ReplaceAll(result, "\\\"", "\"")
 		return fmt.Sprintf("```json\n%s\n```", result)
 	}
-	
+
 	return fmt.Sprintf("```\n%s\n```", result)
 }
