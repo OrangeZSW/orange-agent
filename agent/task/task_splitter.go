@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"orange-agent/domain"
 	"orange-agent/utils/logger"
@@ -42,16 +44,21 @@ func (ts *TaskSplitter) Split(ctx context.Context, task *domain.Task, analysis *
       "description": "子任务描述",
       "input": {
         "key": "value"
-      }
+      },
+      "dependencies": ["task_index_1", "task_index_2"],  // 可选，依赖的其他任务索引
+      "execution_order": 0,  // 执行顺序，从0开始
+      "can_parallel": false  // 是否可并行执行
     }
   ]
 }
 
-子任务应该：
-1. 每个子任务相对独立，可并行执行
-2. 有明确的输入输出
+拆分指导原则：
+1. 考虑任务之间的依赖关系，明确标注dependencies字段
+2. 子任务应该按顺序执行，只有无依赖的任务可并行
 3. 任务描述要具体可执行
 4. 输入部分要包含该子任务需要的所有信息
+5. 对于需要顺序执行的子任务，设置can_parallel: false
+6. 通过execution_order字段指定建议的执行顺序
 
 只返回JSON，不要其他内容。`,
 		task.Description,
@@ -72,8 +79,11 @@ func (ts *TaskSplitter) Split(ctx context.Context, task *domain.Task, analysis *
 	// 解析JSON响应
 	var result struct {
 		Subtasks []struct {
-			Description string                 `json:"description"`
-			Input       map[string]interface{} `json:"input"`
+			Description    string                 `json:"description"`
+			Input          map[string]interface{} `json:"input"`
+			Dependencies   []string               `json:"dependencies"`
+			ExecutionOrder int                    `json:"execution_order"`
+			CanParallel    bool                   `json:"can_parallel"`
 		} `json:"subtasks"`
 	}
 
@@ -85,16 +95,82 @@ func (ts *TaskSplitter) Split(ctx context.Context, task *domain.Task, analysis *
 
 	// 创建SubTask对象
 	var subTasks []*domain.SubTask
-	for _, st := range result.Subtasks {
+	for i, st := range result.Subtasks {
 		subTask := &domain.SubTask{
-			Description: st.Description,
-			Status:      domain.StatusPending,
-			Input:       st.Input,
-			TaskID:      task.ID,
+			Description:    st.Description,
+			Status:         domain.StatusPending,
+			Input:          st.Input,
+			TaskID:         task.ID,
+			Dependencies:   st.Dependencies,
+			ExecutionOrder: st.ExecutionOrder,
+			CanParallel:    st.CanParallel,
+			IsDAGNode:      len(st.Dependencies) > 0, // 如果有依赖关系，标记为DAG节点
 		}
+
+		// 如果LLM没有设置执行顺序，按默认顺序设置
+		if subTask.ExecutionOrder == 0 && i > 0 {
+			subTask.ExecutionOrder = i
+		}
+
 		subTasks = append(subTasks, subTask)
 	}
 
+	// 优化依赖关系：将文本索引转换为实际ID引用
+	ts.optimizeDependencies(subTasks)
+
 	logger.Info("任务拆分完成，共拆分为 %d 个子任务", len(subTasks))
+	logger.Info("子任务依赖关系:")
+	for i, st := range subTasks {
+		if len(st.Dependencies) > 0 {
+			logger.Info("  任务%d (顺序:%d, 并行:%v) 依赖: %v",
+				i+1, st.ExecutionOrder, st.CanParallel, st.Dependencies)
+		} else {
+			logger.Info("  任务%d (顺序:%d, 并行:%v) 无依赖",
+				i+1, st.ExecutionOrder, st.CanParallel)
+		}
+	}
+
 	return subTasks, nil
+}
+
+// optimizeDependencies 优化依赖关系，将文本索引转换为实际ID引用
+func (ts *TaskSplitter) optimizeDependencies(subTasks []*domain.SubTask) {
+	// 创建索引映射
+	indexMap := make(map[string]string)
+	for i, task := range subTasks {
+		// 使用任务索引作为键
+		indexMap[strconv.Itoa(i)] = fmt.Sprintf("task_%d", task.ID)
+		indexMap[fmt.Sprintf("task_%d", i+1)] = fmt.Sprintf("task_%d", task.ID)
+		indexMap[fmt.Sprintf("任务%d", i+1)] = fmt.Sprintf("task_%d", task.ID)
+	}
+
+	// 转换依赖关系
+	for _, task := range subTasks {
+		var normalizedDeps []string
+		for _, dep := range task.Dependencies {
+			// 清理依赖字符串
+			dep = strings.TrimSpace(dep)
+			dep = strings.Trim(dep, "\"")
+
+			// 尝试映射
+			if mapped, ok := indexMap[dep]; ok {
+				normalizedDeps = append(normalizedDeps, mapped)
+			} else {
+				// 保持原样
+				normalizedDeps = append(normalizedDeps, dep)
+			}
+		}
+		task.Dependencies = normalizedDeps
+	}
+}
+
+// extractJSON 从字符串中提取JSON部分
+func extractJSON(content string) string {
+	// 查找第一个 { 和最后一个 }
+	start := strings.Index(content, "{")
+	end := strings.LastIndex(content, "}")
+	if start == -1 || end == -1 || start >= end {
+		return content
+	}
+	return content[start : end+1]
 }

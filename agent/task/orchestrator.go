@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 
 	"orange-agent/agent/interfaces"
 	"orange-agent/domain"
@@ -17,6 +18,7 @@ type TaskOrchestrator struct {
 	taskSplitter     *TaskSplitter
 	resultAggregator *ResultAggregator
 	taskSummarizer   *TaskSummarizer
+	dagEngine        *DAGEngine
 	agentManager     interfaces.AgentManager
 	taskChat         TaskChat
 }
@@ -25,6 +27,7 @@ type TaskOrchestrator struct {
 type OrchestratorConfig struct {
 	WorkerCount     int
 	QueueBufferSize int
+	UseDAGEngine    bool // 是否使用DAG引擎
 }
 
 // DefaultOrchestratorConfig 默认配置
@@ -32,6 +35,7 @@ func DefaultOrchestratorConfig() *OrchestratorConfig {
 	return &OrchestratorConfig{
 		WorkerCount:     3,
 		QueueBufferSize: 100,
+		UseDAGEngine:    true, // 默认使用DAG引擎
 	}
 }
 
@@ -42,12 +46,14 @@ func NewTaskOrchestrator(config *OrchestratorConfig, taskChat TaskChat) *TaskOrc
 	}
 
 	contextManager := NewContextManager()
+	dagEngine := NewDAGEngine(taskChat, config.WorkerCount)
 
 	return &TaskOrchestrator{
 		contextManager: contextManager,
 		taskAnalyzer:   NewTaskAnalyzer(taskChat),
 		taskSplitter:   NewTaskSplitter(taskChat),
 		taskSummarizer: NewTaskSummarizer(taskChat),
+		dagEngine:      dagEngine,
 		taskChat:       taskChat,
 	}
 }
@@ -76,15 +82,104 @@ func (to *TaskOrchestrator) Execute(ctx context.Context, task *domain.Task) (str
 	}
 
 	task.Subtasks = subTasks
-	logger.Info("拆分任务成功，共生成 %d 个任务:", len(subTasks))
-	for i, subTask := range subTasks {
-		logger.Info("  任务%d: %s", i+1, subTask.Description)
+	logger.Info("拆分任务成功，共生成 %d 个子任务:", len(subTasks))
+
+	// 3. 根据子任务特性选择执行引擎
+	useDAG := to.shouldUseDAGEngine(subTasks)
+	logger.Info("执行引擎选择: %s", map[bool]string{true: "DAG引擎", false: "顺序引擎"}[useDAG])
+
+	if useDAG {
+		// 使用DAG引擎执行
+		_, err := to.dagEngine.ExecuteDAG(ctx, task)
+		if err != nil {
+			return "", fmt.Errorf("DAG执行失败: %w", err)
+		}
+		
+		// 6. 生成最终总结
+		logger.Info("开始生成任务总结...")
+		summary := to.buildSummaryFromSubTasks(subTasks)
+		finalSummary, err := to.taskSummarizer.Summarize(ctx, task, summary)
+		if err != nil {
+			return "", fmt.Errorf("生成总结失败: %w", err)
+		}
+
+		task.Result = finalSummary
+		task.Status = domain.StatusCompleted
+
+		logger.Info("任务总结生成完成")
+		logger.Info("任务执行流程全部完成")
+		return finalSummary, nil
+	} else {
+		// 使用顺序引擎执行
+		summary, err := to.executeSequential(ctx, task, subTasks)
+		if err != nil {
+			return "", fmt.Errorf("顺序执行失败: %w", err)
+		}
+
+		// 6. 生成最终总结
+		logger.Info("开始生成任务总结...")
+		finalSummary, err := to.taskSummarizer.Summarize(ctx, task, summary)
+		if err != nil {
+			return "", fmt.Errorf("生成总结失败: %w", err)
+		}
+
+		task.Result = finalSummary
+		task.Status = domain.StatusCompleted
+
+		logger.Info("任务总结生成完成")
+		logger.Info("任务执行流程全部完成")
+		return finalSummary, nil
+	}
+}
+
+// shouldUseDAGEngine 判断是否应该使用DAG引擎
+func (to *TaskOrchestrator) shouldUseDAGEngine(subTasks []*domain.SubTask) bool {
+	// 检查是否有显式的依赖关系
+	hasExplicitDependencies := false
+	hasComplexDependencies := false
+	
+	for _, task := range subTasks {
+		if len(task.Dependencies) > 0 {
+			hasExplicitDependencies = true
+		}
+		if len(task.Dependencies) > 1 {
+			hasComplexDependencies = true
+		}
 	}
 
-	// 3. 创建结果聚合器
+	// 如果有复杂的依赖关系，使用DAG引擎
+	if hasComplexDependencies {
+		return true
+	}
+
+	// 如果有显式依赖关系且不是简单的线性顺序，使用DAG引擎
+	if hasExplicitDependencies {
+		// 检查是否所有任务都标记为可并行
+		allParallel := true
+		for _, task := range subTasks {
+			if !task.CanParallel {
+				allParallel = false
+				break
+			}
+		}
+		return !allParallel // 如果有依赖但不可完全并行，使用DAG
+	}
+
+	// 默认使用顺序引擎
+	return false
+}
+
+// executeSequential 顺序执行子任务
+func (to *TaskOrchestrator) executeSequential(ctx context.Context, task *domain.Task, subTasks []*domain.SubTask) (*AggregationSummary, error) {
+	// 按执行顺序排序
+	sort.Slice(subTasks, func(i, j int) bool {
+		return subTasks[i].ExecutionOrder < subTasks[j].ExecutionOrder
+	})
+
+	// 创建结果聚合器
 	to.resultAggregator = NewResultAggregator(subTasks)
 
-	// 4. 顺序执行子任务，前一个的结果传给后一个
+	// 顺序执行子任务，前一个的结果传给后一个
 	var previousResult string
 	for i, subTask := range subTasks {
 		// 如果不是第一个任务，将前一个任务的结果作为输入
@@ -97,7 +192,7 @@ func (to *TaskOrchestrator) Execute(ctx context.Context, task *domain.Task) (str
 		}
 
 		// 执行当前子任务
-		logger.Info("开始执行任务%d: %s", i+1, subTask.Description)
+		logger.Info("开始执行任务%d (顺序:%d): %s", i+1, subTask.ExecutionOrder, subTask.Description)
 		to.executeSubTask(ctx, subTask)
 
 		// 收集结果
@@ -116,22 +211,22 @@ func (to *TaskOrchestrator) Execute(ctx context.Context, task *domain.Task) (str
 		previousResult = subTask.Output
 	}
 
-	// 5. 获取聚合摘要
-	summary := to.resultAggregator.GetSummary()
+	// 获取聚合摘要
+	return to.resultAggregator.GetSummary(), nil
+}
 
-	// 6. 生成最终总结
-	logger.Info("开始生成任务总结...")
-	finalResult, err := to.taskSummarizer.Summarize(ctx, task, summary)
-	if err != nil {
-		return "", fmt.Errorf("生成总结失败: %w", err)
+// buildSummaryFromSubTasks 从子任务构建摘要
+func (to *TaskOrchestrator) buildSummaryFromSubTasks(subTasks []*domain.SubTask) *AggregationSummary {
+	// 创建结果聚合器
+	resultAggregator := NewResultAggregator(subTasks)
+	
+	// 添加所有子任务结果
+	for _, subTask := range subTasks {
+		resultAggregator.AddResult(subTask)
 	}
-
-	task.Result = finalResult
-	task.Status = domain.StatusCompleted
-
-	logger.Info("任务总结生成完成")
-	logger.Info("任务执行流程全部完成")
-	return finalResult, nil
+	
+	// 获取聚合摘要
+	return resultAggregator.GetSummary()
 }
 
 // executeSubTask 执行单个子任务
@@ -189,4 +284,9 @@ func (to *TaskOrchestrator) buildTaskPrompt(subTask *domain.SubTask) string {
 // GetResultAggregator 获取结果聚合器
 func (to *TaskOrchestrator) GetResultAggregator() *ResultAggregator {
 	return to.resultAggregator
+}
+
+// GetDAGEngine 获取DAG引擎
+func (to *TaskOrchestrator) GetDAGEngine() *DAGEngine {
+	return to.dagEngine
 }

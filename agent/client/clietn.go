@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"orange-agent/agent/interfaces"
 	"orange-agent/agent/tools"
+	"orange-agent/agent/utils"
 	"orange-agent/domain"
 	"orange-agent/repository"
 	"orange-agent/repository/resource"
@@ -15,18 +16,20 @@ import (
 )
 
 type client struct {
-	llm         *openai.LLM
-	repo        *repository.Repositories
-	log         *logger.Logger
-	AgentConfig *domain.AgentConfig
-	manager     interfaces.Manager
+	llm              *openai.LLM
+	repo             *repository.Repositories
+	log              *logger.Logger
+	AgentConfig      *domain.AgentConfig
+	manager          interfaces.Manager
+	messageFormatter *utils.ToolMessageFormatter
 }
 
 func NewClient(Manager interfaces.Manager) interfaces.Client {
 	return &client{
-		repo:    resource.GetRepositories(),
-		log:     logger.GetLogger(),
-		manager: Manager,
+		repo:             resource.GetRepositories(),
+		log:              logger.GetLogger(),
+		manager:          Manager,
+		messageFormatter: utils.NewToolMessageFormatter(),
 	}
 }
 
@@ -92,13 +95,36 @@ func (c *client) HandleToolCalls(ctx context.Context, message []llms.MessageCont
 				},
 			})
 			c.log.Info("调用工具:%s,参数:%.20s", toolcall.FunctionCall.Name, toolcall.FunctionCall.Arguments)
-			c.manager.TeleGramSendMessage(fmt.Sprintf("调用工具:%s,参数:%v", toolcall.FunctionCall.Name, toolcall.FunctionCall.Arguments))
+			
+			// 发送美化的工具调用消息到Telegram
+			callMessage := c.messageFormatter.FormatToolCallMessage(
+				toolcall.FunctionCall.Name, 
+				toolcall.FunctionCall.Arguments,
+			)
+			c.manager.TeleGramSendMessage(callMessage)
+			
 			res, err := tools.GetTools()[toolcall.FunctionCall.Name].Call(ctx, toolcall.FunctionCall.Arguments)
 			if err != nil {
 				c.log.Error("调用工具:%s失败,参数:%.20s,错误:%.200s", toolcall.FunctionCall.Name, toolcall.FunctionCall.Arguments, err)
 				res = "调用工具失败"
+				// 发送美化的工具调用失败消息到Telegram
+				errorMessage := c.messageFormatter.FormatToolErrorMessage(
+					toolcall.FunctionCall.Name, 
+					toolcall.FunctionCall.Arguments, 
+					err.Error(),
+				)
+				c.manager.TeleGramSendMessage(errorMessage)
+			} else {
+				c.log.Info("调用工具:%s成功,参数:%.20s,工具输出:%.200s", toolcall.FunctionCall.Name, toolcall.FunctionCall.Arguments, res)
+				// 发送美化的工具调用成功消息到Telegram
+				successMessage := c.messageFormatter.FormatToolSuccessMessage(
+					toolcall.FunctionCall.Name, 
+					toolcall.FunctionCall.Arguments, 
+					res,
+				)
+				c.manager.TeleGramSendMessage(successMessage)
 			}
-			c.log.Info("调用工具:%s成功,参数:%.20s,工具输出:%.200s", toolcall.FunctionCall.Name, toolcall.FunctionCall.Arguments, res)
+			
 			toolsMessage.Parts = append(toolsMessage.Parts, llms.ToolCallResponse{
 				ToolCallID: toolcall.ID,
 				Content:    res,
