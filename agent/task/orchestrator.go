@@ -54,15 +54,18 @@ func NewTaskOrchestrator(config *OrchestratorConfig, taskChat TaskChat) *TaskOrc
 
 // Execute 执行整个任务流程
 func (to *TaskOrchestrator) Execute(ctx context.Context, task *domain.Task) (string, error) {
-	logger.Info("开始执行任务编排流程")
+	logger.Info("开始执行任务: %s", task.Description)
 
 	// 1. 分析任务
+	logger.Info("开始分析任务...")
 	analysis, err := to.taskAnalyzer.Analyze(ctx, task.Description)
 	if err != nil {
 		return "", fmt.Errorf("任务分析失败: %w", err)
 	}
+	logger.Info("任务分析完成")
 
 	// 2. 拆分任务
+	logger.Info("开始拆分任务...")
 	subTasks, err := to.taskSplitter.Split(ctx, task, analysis)
 	if err != nil {
 		return "", fmt.Errorf("任务拆分失败: %w", err)
@@ -73,6 +76,10 @@ func (to *TaskOrchestrator) Execute(ctx context.Context, task *domain.Task) (str
 	}
 
 	task.Subtasks = subTasks
+	logger.Info("拆分任务成功，共生成 %d 个任务:", len(subTasks))
+	for i, subTask := range subTasks {
+		logger.Info("  任务%d: %s", i+1, subTask.Description)
+	}
 
 	// 3. 创建结果聚合器
 	to.resultAggregator = NewResultAggregator(subTasks)
@@ -87,31 +94,33 @@ func (to *TaskOrchestrator) Execute(ctx context.Context, task *domain.Task) (str
 			}
 			subTask.Input["previous_result"] = previousResult
 			subTask.Input["previous_subtask_index"] = i - 1
-			logger.Info("子任务 %d 接收到前一个子任务的结果作为输入", i)
 		}
 
 		// 执行当前子任务
-		logger.Info("开始执行子任务 %d/%d: %s", i+1, len(subTasks), subTask.Description)
+		logger.Info("开始执行任务%d: %s", i+1, subTask.Description)
 		to.executeSubTask(ctx, subTask)
 
 		// 收集结果
 		to.resultAggregator.AddResult(subTask)
 
-		// 检查任务是否失败
+		// 记录任务执行结果
 		if subTask.Status == domain.StatusFailed {
-			logger.Error("子任务 %d 执行失败，终止后续任务", i+1)
+			logger.Info("任务%d执行结果: 失败 - %s", i+1, subTask.Error)
+			logger.Error("任务%d执行失败，终止后续任务", i+1)
 			break
+		} else {
+			logger.Info("任务%d执行结果: 成功", i+1)
 		}
 
 		// 保存当前任务结果作为下一个任务的输入
 		previousResult = subTask.Output
-		logger.Info("子任务 %d 执行完成，结果已保存用于下一个任务", i+1)
 	}
 
 	// 5. 获取聚合摘要
 	summary := to.resultAggregator.GetSummary()
 
 	// 6. 生成最终总结
+	logger.Info("开始生成任务总结...")
 	finalResult, err := to.taskSummarizer.Summarize(ctx, task, summary)
 	if err != nil {
 		return "", fmt.Errorf("生成总结失败: %w", err)
@@ -120,7 +129,8 @@ func (to *TaskOrchestrator) Execute(ctx context.Context, task *domain.Task) (str
 	task.Result = finalResult
 	task.Status = domain.StatusCompleted
 
-	logger.Info("任务编排流程执行完成")
+	logger.Info("任务总结生成完成")
+	logger.Info("任务执行流程全部完成")
 	return finalResult, nil
 }
 

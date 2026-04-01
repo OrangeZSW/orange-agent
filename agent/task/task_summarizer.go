@@ -38,7 +38,31 @@ func (ts *TaskSummarizer) Summarize(ctx context.Context, originalTask *domain.Ta
 
 // buildSummaryPrompt 构建总结提示词
 func (ts *TaskSummarizer) buildSummaryPrompt(originalTask *domain.Task, summary *AggregationSummary) string {
-	prompt := fmt.Sprintf(`请为以下任务生成最终总结报告：
+	prompt := fmt.Sprintf(`请为以下任务生成最终总结报告，按照以下格式组织：
+
+## 任务执行流程
+
+开始分析任务 -》 拆分任务成功，%d 个任务：
+`, summary.Total)
+
+	for i, result := range summary.Results {
+		prompt += fmt.Sprintf("任务%d: %s\n", i+1, result.Description)
+	}
+
+	for i, result := range summary.Results {
+		prompt += fmt.Sprintf("\n-》任务%d执行：%s\n", i+1, result.Description)
+		prompt += fmt.Sprintf("-》任务%d执行结果：", i+1)
+		if result.Status == "completed" {
+			prompt += "成功\n"
+			prompt += fmt.Sprintf("%s\n", result.Output)
+		} else {
+			prompt += fmt.Sprintf("失败 - %s\n", result.Error)
+		}
+	}
+
+	prompt += "\n-》任务总结"
+
+	prompt += fmt.Sprintf(`
 
 ## 原始任务
 %s
@@ -48,28 +72,7 @@ func (ts *TaskSummarizer) buildSummaryPrompt(originalTask *domain.Task, summary 
 - 成功完成: %d
 - 失败: %d
 
-## 子任务详情：
-`, originalTask.Description, summary.Total, summary.Completed, summary.Failed)
-
-	for i, result := range summary.Results {
-		prompt += fmt.Sprintf("\n### 子任务 %d: %s\n", i+1, result.Description)
-		prompt += fmt.Sprintf("- 状态: %s\n", result.Status)
-
-		if result.Status == "completed" {
-			prompt += fmt.Sprintf("- 输出结果:\n%s\n", result.Output)
-		} else {
-			prompt += fmt.Sprintf("- 错误信息: %s\n", result.Error)
-		}
-	}
-
-	prompt += `
-请生成一份完整的总结报告，包括：
-1. 任务整体完成情况
-2. 每个子任务的主要成果
-3. 失败任务的影响分析
-4. 最终结论和建议
-
-请以清晰、专业的格式呈现。`
+请按照上面的"任务执行流程"格式，生成一份完整的总结报告，保持清晰的流程感。`, originalTask.Description, summary.Total, summary.Completed, summary.Failed)
 
 	return prompt
 }
