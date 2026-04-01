@@ -148,37 +148,27 @@ func getAgentConfigs() ([]domain.AgentConfig, error) {
 		return []domain.AgentConfig{}, nil
 	}
 	
-	var rawAgentList []map[string]interface{}
-	if err := json.Unmarshal([]byte(result), &rawAgentList); err != nil {
-		// 如果不是JSON数组，尝试解析为单个对象
-		var singleAgent map[string]interface{}
-		if err := json.Unmarshal([]byte(result), &singleAgent); err != nil {
-			return nil, fmt.Errorf("解析Agent列表失败: %v", err)
-		}
-		rawAgentList = []map[string]interface{}{singleAgent}
+	// 首先解析为包含data字段的对象
+	var responseObj map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &responseObj); err != nil {
+		return nil, fmt.Errorf("解析Agent列表响应失败: %v", err)
 	}
 	
-	// 转换为domain.AgentConfig
+	// 从data字段获取Agent列表
+	dataField, ok := responseObj["data"]
+	if !ok {
+		return []domain.AgentConfig{}, nil
+	}
+	
+	// 将data字段转换为JSON字符串再解析为Agent数组
+	dataJSON, err := json.Marshal(dataField)
+	if err != nil {
+		return nil, fmt.Errorf("转换data字段失败: %v", err)
+	}
+	
 	var agentConfigs []domain.AgentConfig
-	for _, rawAgent := range rawAgentList {
-		var models []string
-		if modelsRaw, ok := rawAgent["models"].([]interface{}); ok {
-			for _, m := range modelsRaw {
-				if modelName, ok := m.(string); ok {
-					models = append(models, modelName)
-				}
-			}
-		}
-		
-		name := ""
-		if nameRaw, ok := rawAgent["name"].(string); ok {
-			name = nameRaw
-		}
-		
-		agentConfigs = append(agentConfigs, domain.AgentConfig{
-			Name:   name,
-			Models: models,
-		})
+	if err := json.Unmarshal(dataJSON, &agentConfigs); err != nil {
+		return nil, fmt.Errorf("解析Agent配置失败: %v", err)
 	}
 	
 	return agentConfigs, nil
