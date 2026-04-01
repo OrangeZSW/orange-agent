@@ -81,6 +81,10 @@ func (cm *CommandManager) registerHandlers() {
 	cm.Register(&AgentAddCommand{})
 	cm.Register(&AgentRemoveCommand{})
 	cm.Register(&AgentUpdateCommand{})
+
+	// 模型切换命令
+	cm.Register(&ModelCommand{})
+	cm.Register(&ModelSetCommand{})
 }
 
 // Register 注册一个命令处理器
@@ -165,6 +169,8 @@ func (h *HelpCommand) Handle(ctx context.Context, c telebot.Context, user *domai
 	response.WriteString("`/test` - 运行测试\n")
 	response.WriteString("`/agents` - 列出所有Agent\n")
 	response.WriteString("`/db SELECT * FROM users` - 执行数据库查询\n")
+	response.WriteString("`/model` - 查看和切换AI模型\n")
+	response.WriteString("`/modelset gpt-4` - 快速切换到指定模型\n")
 
 	return response.String()
 }
@@ -181,7 +187,13 @@ func (s *StatusCommand) Description() string {
 }
 
 func (s *StatusCommand) Handle(ctx context.Context, c telebot.Context, user *domain.User, args []string) string {
-	return "🟢 *系统状态*\n\n• 系统运行正常\n• Orange Agent v1.0.0\n• Telegram Bot 已连接\n• AI Agent 已配置\n\n📊 使用 `/help` 查看所有可用命令"
+	// 显示当前模型信息
+	currentModel := "未设置"
+	if user != nil && user.ModelName != "" {
+		currentModel = user.ModelName
+	}
+
+	return fmt.Sprintf("🟢 *系统状态*\n\n• 系统运行正常\n• Orange Agent v1.0.0\n• Telegram Bot 已连接\n• AI Agent 已配置\n• *当前模型:* %s\n\n📊 使用 `/help` 查看所有可用命令", currentModel)
 }
 
 // ToolsCommand 工具列表命令
@@ -281,4 +293,22 @@ func executeTool(toolName string, params interface{}) (string, error) {
 	}
 
 	return result, nil
+}
+
+// executeDBTool 执行数据库工具函数
+func executeDBTool(query string, args []interface{}) (string, error) {
+	params := map[string]interface{}{
+		"query": query,
+		"args":  args,
+	}
+
+	// 判断是查询还是执行操作
+	toolName := "database_query"
+	if strings.HasPrefix(strings.ToUpper(query), "INSERT") ||
+		strings.HasPrefix(strings.ToUpper(query), "UPDATE") ||
+		strings.HasPrefix(strings.ToUpper(query), "DELETE") {
+		toolName = "database_execute"
+	}
+
+	return executeTool(toolName, params)
 }
