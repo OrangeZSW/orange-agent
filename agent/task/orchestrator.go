@@ -15,11 +15,10 @@ type TaskOrchestrator struct {
 	contextManager   *ContextManager
 	taskAnalyzer     *TaskAnalyzer
 	taskSplitter     *TaskSplitter
-	taskQueue        *TaskQueue
-	workerPool       *WorkerPool
 	resultAggregator *ResultAggregator
 	taskSummarizer   *TaskSummarizer
 	agentManager     interfaces.AgentManager
+	taskChat         TaskChat
 }
 
 // OrchestratorConfig 编排器配置
@@ -43,24 +42,19 @@ func NewTaskOrchestrator(config *OrchestratorConfig, taskChat TaskChat) *TaskOrc
 	}
 
 	contextManager := NewContextManager()
-	taskQueue := NewTaskQueue(config.QueueBufferSize)
 
 	return &TaskOrchestrator{
 		contextManager: contextManager,
 		taskAnalyzer:   NewTaskAnalyzer(taskChat),
 		taskSplitter:   NewTaskSplitter(taskChat),
-		taskQueue:      taskQueue,
-		workerPool:     NewWorkerPool(config.WorkerCount, taskQueue, contextManager, taskChat),
 		taskSummarizer: NewTaskSummarizer(taskChat),
+		taskChat:       taskChat,
 	}
 }
 
 // Execute 执行整个任务流程
 func (to *TaskOrchestrator) Execute(ctx context.Context, task *domain.Task) (string, error) {
 	logger.Info("开始执行任务编排流程")
-
-	// 重新创建 worker pool，传入 ctx
-	to.workerPool = NewWorkerPoolWithCtx(ctx, to.workerPool.workerCount, to.taskQueue, to.contextManager, to.workerPool.taskChat)
 
 	// 1. 分析任务
 	analysis, err := to.taskAnalyzer.Analyze(ctx, task.Description)
@@ -83,35 +77,41 @@ func (to *TaskOrchestrator) Execute(ctx context.Context, task *domain.Task) (str
 	// 3. 创建结果聚合器
 	to.resultAggregator = NewResultAggregator(subTasks)
 
-	// 4. 启动工作池
-	to.workerPool.Start()
-	defer to.workerPool.Stop()
-
-	// 5. 将子任务加入队列
-	for _, subTask := range subTasks {
-		if err := to.taskQueue.Enqueue(subTask); err != nil {
-			logger.Error("加入任务队列失败: %v", err)
+	// 4. 顺序执行子任务，前一个的结果传给后一个
+	var previousResult string
+	for i, subTask := range subTasks {
+		// 如果不是第一个任务，将前一个任务的结果作为输入
+		if i > 0 && previousResult != "" {
+			if subTask.Input == nil {
+				subTask.Input = make(map[string]interface{})
+			}
+			subTask.Input["previous_result"] = previousResult
+			subTask.Input["previous_subtask_index"] = i - 1
+			logger.Info("子任务 %d 接收到前一个子任务的结果作为输入", i)
 		}
-	}
 
-	// 6. 关闭队列（不再接受新任务）
-	to.taskQueue.Close()
+		// 执行当前子任务
+		logger.Info("开始执行子任务 %d/%d: %s", i+1, len(subTasks), subTask.Description)
+		to.executeSubTask(ctx, subTask)
 
-	// 7. 收集结果
-	resultChan := to.workerPool.GetResultChan()
-	for subTask := range resultChan {
+		// 收集结果
 		to.resultAggregator.AddResult(subTask)
 
-		// 检查是否所有任务都已完成
-		if to.resultAggregator.IsComplete() {
+		// 检查任务是否失败
+		if subTask.Status == domain.StatusFailed {
+			logger.Error("子任务 %d 执行失败，终止后续任务", i+1)
 			break
 		}
+
+		// 保存当前任务结果作为下一个任务的输入
+		previousResult = subTask.Output
+		logger.Info("子任务 %d 执行完成，结果已保存用于下一个任务", i+1)
 	}
 
-	// 8. 获取聚合摘要
+	// 5. 获取聚合摘要
 	summary := to.resultAggregator.GetSummary()
 
-	// 9. 生成最终总结
+	// 6. 生成最终总结
 	finalResult, err := to.taskSummarizer.Summarize(ctx, task, summary)
 	if err != nil {
 		return "", fmt.Errorf("生成总结失败: %w", err)
@@ -122,6 +122,58 @@ func (to *TaskOrchestrator) Execute(ctx context.Context, task *domain.Task) (str
 
 	logger.Info("任务编排流程执行完成")
 	return finalResult, nil
+}
+
+// executeSubTask 执行单个子任务
+func (to *TaskOrchestrator) executeSubTask(ctx context.Context, subTask *domain.SubTask) {
+	// 创建独立的任务上下文
+	taskCtx := to.contextManager.CreateTaskContext(
+		subTask.ID,
+		"You are a helpful assistant that executes tasks efficiently.",
+	)
+	subTask.Context = taskCtx
+
+	// 构建任务提示
+	prompt := to.buildTaskPrompt(subTask)
+
+	// 添加用户消息到上下文
+	to.contextManager.AddMessage(subTask.ID, "user", prompt, len(prompt))
+
+	// 执行任务
+	messages := []domain.Message{
+		{Role: "system", Content: taskCtx.SystemPrompt},
+		{Role: "user", Content: prompt},
+	}
+
+	response := to.taskChat.Chat(ctx, messages)
+
+	// 添加助手响应到上下文
+	to.contextManager.AddMessage(subTask.ID, "assistant", response, len(response))
+
+	// 更新子任务状态
+	subTask.Status = domain.StatusCompleted
+	subTask.Output = response
+
+	logger.Info("子任务执行成功: %s", subTask.Description)
+}
+
+// buildTaskPrompt 构建任务提示
+func (to *TaskOrchestrator) buildTaskPrompt(subTask *domain.SubTask) string {
+	prompt := fmt.Sprintf("请执行以下任务：\n\n任务描述：%s\n\n", subTask.Description)
+
+	if len(subTask.Input) > 0 {
+		prompt += "输入信息：\n"
+		for key, value := range subTask.Input {
+			if key == "previous_result" {
+				prompt += fmt.Sprintf("- 前一个子任务的执行结果：\n%s\n", value)
+			} else {
+				prompt += fmt.Sprintf("- %s: %v\n", key, value)
+			}
+		}
+	}
+
+	prompt += "\n请详细完成该任务，并返回结果。"
+	return prompt
 }
 
 // GetResultAggregator 获取结果聚合器
