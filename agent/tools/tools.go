@@ -20,7 +20,6 @@ var Once sync.Once
 func InitTools() {
 	Once.Do(func() {
 		Tools = append(Tools, file.FileTools...)
-		Tools = append(Tools, CurrTimeTool)
 		Tools = append(Tools, git.GitTools...)
 		Tools = append(Tools, system.SystemTools...)
 		Tools = append(Tools, agent.AgentTools...)

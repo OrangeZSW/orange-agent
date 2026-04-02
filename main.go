@@ -25,12 +25,8 @@ func main() {
 	if err := rag.InitializeWithRedis(ragConfig); err != nil {
 		logger.GetLogger().Warn("Redis向量存储初始化失败: %v，代码搜索功能将不可用", err)
 	}
-
-	// 初始化Agent
-	agentInstance := agent.NewAgent()
-
 	// 初始化并启动Telegram
 	tg := telegram.NewTelegram()
-	client := tg.Init(&cfg.Telegram, agentInstance)
+	client := tg.Init(&cfg.Telegram, agent.NewAgent())
 	client.Start()
 }

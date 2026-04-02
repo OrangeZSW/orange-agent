@@ -17,15 +17,32 @@ const (
 	vectorIndexName = "rag_vector_idx"
 	// Redis Hash前缀
 	vectorHashPrefix = "rag:doc:"
+	// Redis文件元数据前缀
+	fileMetaPrefix = "rag:file:"
 )
 
 // VectorStore 向量存储接口
 type VectorStore interface {
+	// Add 添加向量
 	Add(ctx context.Context, id string, vector []float64, chunk Chunk) error
+	// Search 搜索相似向量
 	Search(ctx context.Context, queryVector []float64, topK int) ([]SearchResult, error)
+	// Clear 清空所有数据
 	Clear(ctx context.Context) error
+	// Size 返回向量数量
 	Size(ctx context.Context) (int, error)
+	// Close 关闭连接
 	Close() error
+	// DeleteByFilePath 删除指定文件的所有向量
+	DeleteByFilePath(ctx context.Context, filePath string) error
+	// SetFileMeta 设置文件元数据（修改时间）
+	SetFileMeta(ctx context.Context, filePath string, modTime int64) error
+	// GetFileMeta 获取文件元数据
+	GetFileMeta(ctx context.Context, filePath string) (int64, error)
+	// GetAllIndexedFiles 获取所有已索引文件
+	GetAllIndexedFiles(ctx context.Context) (map[string]int64, error)
+	// DeleteFileMeta 删除文件元数据
+	DeleteFileMeta(ctx context.Context, filePath string) error
 }
 
 // SearchResult 搜索结果
@@ -34,20 +51,20 @@ type SearchResult struct {
 	Score float64
 }
 
-// RedisVectorStore Redis向量存储（使用RediSearch）
-type RedisVectorStore struct {
-	client    *redis.Client
-	vectorDim int
-	mu        sync.RWMutex
-	log       *logger.Logger
-}
-
 // RedisConfig Redis配置
 type RedisConfig struct {
 	Host     string
 	Port     int
 	Password string
 	DB       int
+}
+
+// RedisVectorStore Redis向量存储
+type RedisVectorStore struct {
+	client    *redis.Client
+	vectorDim int
+	mu        sync.RWMutex
+	log       *logger.Logger
 }
 
 // NewRedisVectorStore 创建Redis向量存储
@@ -72,21 +89,23 @@ func NewRedisVectorStore(config *RedisConfig, vectorDim int) (*RedisVectorStore,
 		log:       log,
 	}
 
-	// 创建向量索引
-	if err := store.createIndex(ctx); err != nil {
-		log.Warn("创建向量索引失败（可能已存在）: %v", err)
+	// 创建向量索引（如果不存在）
+	if err := store.ensureIndex(ctx); err != nil {
+		log.Warn("创建向量索引失败: %v", err)
 	}
 
 	return store, nil
 }
 
-// createIndex 创建RediSearch向量索引
-func (s *RedisVectorStore) createIndex(ctx context.Context) error {
-	// 先尝试删除旧索引
-	s.client.Do(ctx, "FT.DROPINDEX", vectorIndexName, "DD")
+// ensureIndex 确保索引存在
+func (s *RedisVectorStore) ensureIndex(ctx context.Context) error {
+	// 检查索引是否存在
+	_, err := s.client.Do(ctx, "FT.INFO", vectorIndexName).Result()
+	if err == nil {
+		return nil // 索引已存在
+	}
 
-	// 创建向量索引
-	// FT.CREATE rag_vector_idx ON HASH PREFIX 1 rag:doc: SCHEMA content TEXT path TAG start NUMERIC end NUMERIC vector VECTOR FLAT 6 TYPE FLOAT32 DIM 256 DISTANCE_METRIC COSINE
+	// 创建索引
 	cmd := []interface{}{
 		"FT.CREATE", vectorIndexName,
 		"ON", "HASH",
@@ -107,7 +126,7 @@ func (s *RedisVectorStore) createIndex(ctx context.Context) error {
 		return fmt.Errorf("创建向量索引失败: %v", err)
 	}
 
-	s.log.Info("RediSearch向量索引创建成功，维度: %d", s.vectorDim)
+	s.log.Info("RediSearch向量索引创建成功")
 	return nil
 }
 
@@ -116,11 +135,9 @@ func (s *RedisVectorStore) Add(ctx context.Context, id string, vector []float64,
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// 将float64向量转为float32字节（RediSearch要求）
 	vectorBytes := float64ToFloat32Bytes(vector)
-
-	// 存储为Hash
 	key := vectorHashPrefix + id
+
 	cmd := []interface{}{
 		"HSET", key,
 		"chunk_id", chunk.ID,
@@ -139,10 +156,8 @@ func (s *RedisVectorStore) Search(ctx context.Context, queryVector []float64, to
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	// 将查询向量转为字节
 	queryBytes := float64ToFloat32Bytes(queryVector)
 
-	// FT.SEARCH rag_vector_idx "*=>[KNN 5 @vector $query_vec]" PARAMS 2 query_vec <bytes> DIALECT 2
 	cmd := []interface{}{
 		"FT.SEARCH", vectorIndexName,
 		fmt.Sprintf("*=>[KNN %d @vector $query_vec]", topK),
@@ -159,7 +174,7 @@ func (s *RedisVectorStore) Search(ctx context.Context, queryVector []float64, to
 	return s.parseSearchResult(result)
 }
 
-// parseSearchResult 解析RediSearch搜索结果
+// parseSearchResult 解析搜索结果
 func (s *RedisVectorStore) parseSearchResult(result interface{}) ([]SearchResult, error) {
 	results, ok := result.([]interface{})
 	if !ok || len(results) < 2 {
@@ -173,7 +188,6 @@ func (s *RedisVectorStore) parseSearchResult(result interface{}) ([]SearchResult
 
 	var searchResults []SearchResult
 
-	// 结果格式: [总数, key1, [field1, val1, ...], key2, [field2, val2, ...], ...]
 	for i := 1; i < len(results); i += 2 {
 		if i+1 >= len(results) {
 			break
@@ -187,7 +201,6 @@ func (s *RedisVectorStore) parseSearchResult(result interface{}) ([]SearchResult
 		chunk := Chunk{}
 		var score float64
 
-		// 解析字段
 		for j := 0; j < len(fields); j += 2 {
 			if j+1 >= len(fields) {
 				break
@@ -208,7 +221,6 @@ func (s *RedisVectorStore) parseSearchResult(result interface{}) ([]SearchResult
 				chunk.EndLine, _ = strconv.Atoi(fieldValue)
 			case "__vector_score":
 				score, _ = strconv.ParseFloat(fieldValue, 64)
-				// 余弦距离转相似度 (1 - distance)
 				score = 1 - score
 			}
 		}
@@ -227,19 +239,103 @@ func (s *RedisVectorStore) Clear(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// 删除索引（同时删除关联的Hash）
-	if err := s.client.Do(ctx, "FT.DROPINDEX", vectorIndexName, "DD").Err(); err != nil {
-		// 索引不存在不算错误
-		s.log.Warn("删除索引失败: %v", err)
+	// 删除索引
+	s.client.Do(ctx, "FT.DROPINDEX", vectorIndexName, "DD")
+
+	// 删除所有rag:doc:* 和 rag:file:* 的key
+	iter := s.client.Scan(ctx, 0, "rag:*", 0).Iterator()
+	for iter.Next(ctx) {
+		s.client.Del(ctx, iter.Val())
 	}
 
 	// 重新创建索引
-	return s.createIndex(ctx)
+	return s.ensureIndex(ctx)
+}
+
+// DeleteByFilePath 删除指定文件的所有向量
+func (s *RedisVectorStore) DeleteByFilePath(ctx context.Context, filePath string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// 使用FT.SEARCH查找该文件的所有chunk
+	cmd := []interface{}{
+		"FT.SEARCH", vectorIndexName,
+		fmt.Sprintf("@path:{%s}", filePath),
+		"RETURN", "1", "chunk_id",
+		"NOCONTENT",
+	}
+
+	result, err := s.client.Do(ctx, cmd...).Result()
+	if err != nil {
+		return err
+	}
+
+	results, ok := result.([]interface{})
+	if !ok || len(results) < 2 {
+		return nil
+	}
+
+	// 删除所有找到的chunk
+	for i := 1; i < len(results); i++ {
+		key := results[i].(string)
+		s.client.Del(ctx, key)
+	}
+
+	return nil
+}
+
+// SetFileMeta 设置文件元数据
+func (s *RedisVectorStore) SetFileMeta(ctx context.Context, filePath string, modTime int64) error {
+	key := fileMetaPrefix + filePath
+	return s.client.Set(ctx, key, modTime, 0).Err()
+}
+
+// GetFileMeta 获取文件元数据
+func (s *RedisVectorStore) GetFileMeta(ctx context.Context, filePath string) (int64, error) {
+	key := fileMetaPrefix + filePath
+	val, err := s.client.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseInt(val, 10, 64)
+}
+
+// DeleteFileMeta 删除文件元数据
+func (s *RedisVectorStore) DeleteFileMeta(ctx context.Context, filePath string) error {
+	key := fileMetaPrefix + filePath
+	return s.client.Del(ctx, key).Err()
+}
+
+// GetAllIndexedFiles 获取所有已索引文件及其修改时间
+func (s *RedisVectorStore) GetAllIndexedFiles(ctx context.Context) (map[string]int64, error) {
+	result := make(map[string]int64)
+
+	iter := s.client.Scan(ctx, 0, fileMetaPrefix+"*", 0).Iterator()
+	for iter.Next(ctx) {
+		key := iter.Val()
+		filePath := key[len(fileMetaPrefix):]
+
+		val, err := s.client.Get(ctx, key).Result()
+		if err != nil {
+			continue
+		}
+
+		modTime, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			continue
+		}
+
+		result[filePath] = modTime
+	}
+
+	return result, iter.Err()
 }
 
 // Size 返回向量数量
 func (s *RedisVectorStore) Size(ctx context.Context) (int, error) {
-	// FT.INFO rag_vector_idx
 	result, err := s.client.Do(ctx, "FT.INFO", vectorIndexName).Result()
 	if err != nil {
 		return 0, err
@@ -250,7 +346,6 @@ func (s *RedisVectorStore) Size(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("解析索引信息失败")
 	}
 
-	// 查找 num_docs 字段
 	for i := 0; i < len(info)-1; i += 2 {
 		if info[i].(string) == "num_docs" {
 			return int(info[i+1].(int64)), nil

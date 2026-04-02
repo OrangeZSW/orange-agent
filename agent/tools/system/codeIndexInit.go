@@ -10,13 +10,18 @@ import (
 
 var CodeIndexInitTool = common.BaseTool{
 	Name:        "code_index_init",
-	Description: "初始化或刷新代码索引。当需要搜索代码但索引未初始化时使用。会对项目代码进行向量化索引，以便后续使用 code_search 搜索。",
+	Description: "初始化或刷新代码索引。支持全量重建和增量更新。增量更新只处理变化的文件，速度更快。",
 	Parameters: map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
 			"project_root": map[string]interface{}{
 				"type":        "string",
 				"description": "项目根目录路径，默认为当前目录 './'",
+			},
+			"mode": map[string]interface{}{
+				"type":        "string",
+				"description": "索引模式: 'full' 全量重建, 'incremental' 增量更新（默认）",
+				"enum":        []string{"full", "incremental"},
 			},
 		},
 		"required": []string{},
@@ -27,22 +32,38 @@ var CodeIndexInitTool = common.BaseTool{
 func handlerCodeIndexInit(ctx context.Context, input string) (string, error) {
 	var params struct {
 		ProjectRoot string `json:"project_root"`
+		Mode        string `json:"mode"`
 	}
 	if err := json.Unmarshal([]byte(input), &params); err != nil {
-		// 如果解析失败，使用默认值
 		params.ProjectRoot = "./"
 	}
 
-	// 设置默认值
 	if params.ProjectRoot == "" {
 		params.ProjectRoot = "./"
 	}
+	if params.Mode == "" {
+		params.Mode = "incremental"
+	}
 
-	if err := rag.InitializeIndex(ctx, params.ProjectRoot); err != nil {
+	var err error
+	var modeName string
+
+	switch params.Mode {
+	case "full":
+		err = rag.InitializeIndex(ctx, params.ProjectRoot)
+		modeName = "全量重建"
+	case "incremental":
+		err = rag.InitializeIndexIncremental(ctx, params.ProjectRoot)
+		modeName = "增量更新"
+	default:
+		return "", fmt.Errorf("不支持的模式: %s，可选值: full, incremental", params.Mode)
+	}
+
+	if err != nil {
 		return "", err
 	}
 
 	retriever := rag.GetRetriever()
 	size, _ := retriever.GetIndexSize(ctx)
-	return "代码索引初始化完成，共索引 " + fmt.Sprintf("%d", size) + " 个代码块。现在可以使用 code_search 工具搜索代码了。", nil
+	return fmt.Sprintf("代码索引%s完成，共 %d 个代码块。现在可以使用 code_search 搜索代码。", modeName, size), nil
 }

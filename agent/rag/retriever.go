@@ -31,19 +31,16 @@ func (r *CodeRetriever) Retrieve(ctx context.Context, query string, topK int) ([
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	// 生成查询向量
 	queryVector, err := r.embedder.Embed(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("生成查询向量失败: %v", err)
 	}
 
-	// 搜索相似的代码块
 	results, err := r.indexer.store.Search(ctx, queryVector, topK)
 	if err != nil {
 		return nil, fmt.Errorf("搜索失败: %v", err)
 	}
 
-	// 提取代码块
 	chunks := make([]Chunk, len(results))
 	for i, result := range results {
 		chunks[i] = result.Chunk
@@ -75,9 +72,14 @@ func (r *CodeRetriever) BuildContext(chunks []Chunk) string {
 	return builder.String()
 }
 
-// IndexDirectory 索引目录
+// IndexDirectory 全量索引目录
 func (r *CodeRetriever) IndexDirectory(ctx context.Context, dirPath string) error {
 	return r.indexer.IndexDirectory(ctx, dirPath)
+}
+
+// IndexDirectoryIncremental 增量索引目录
+func (r *CodeRetriever) IndexDirectoryIncremental(ctx context.Context, dirPath string) error {
+	return r.indexer.IndexDirectoryIncremental(ctx, dirPath)
 }
 
 // GetIndexSize 获取索引大小
