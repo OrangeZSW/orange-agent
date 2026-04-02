@@ -8,7 +8,6 @@ var SystemTools = []common.BaseTool{
 	BuildTool,
 	ProjectRebootTool,
 	EnvManageTool,
-	WebSearchTool,
 	CodeSearchTool,
 	CodeIndexInitTool,
 	CurrTimeTool,

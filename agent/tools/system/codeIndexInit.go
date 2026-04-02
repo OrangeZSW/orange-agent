@@ -10,7 +10,7 @@ import (
 
 var CodeIndexInitTool = common.BaseTool{
 	Name:        "code_index_init",
-	Description: "初始化或刷新代码索引。支持全量重建和增量更新。增量更新只处理变化的文件，速度更快。",
+	Description: "当文件更新，新增，删除，时执行增量更新，当索引文件不存在时，执行全量更新",
 	Parameters: map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
