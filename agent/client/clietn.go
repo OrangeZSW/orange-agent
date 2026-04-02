@@ -66,6 +66,7 @@ func (c *client) Chat(modelName string, message []llms.MessageContent) string {
 }
 
 func (c *client) call(ctx context.Context, message []llms.MessageContent) (*llms.ContentResponse, error) {
+	message = append(message, c.manager.SystemPrompt()...)
 	resp, err := c.llm.GenerateContent(ctx, message, llms.WithTools(tools.GetEllTools()))
 	if err != nil {
 		return nil, err

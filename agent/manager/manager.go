@@ -86,3 +86,17 @@ func NewSkills() []Skill {
 	})
 	return skills
 }
+
+func (r *manager) SystemPrompt() []llms.MessageContent {
+	system := ""
+	//当前系统架构
+	agent, err := file.ReadFile("./AGENT.md")
+	if err != nil {
+		r.log.Error("获取系统AGENT.md失败: %v", err)
+	}
+	system = string(agent)
+	message := []llms.MessageContent{
+		llms.TextParts(llms.ChatMessageTypeHuman, system),
+	}
+	return message
+}
