@@ -75,8 +75,19 @@ func (c *client) call(ctx context.Context, message []llms.MessageContent) (*llms
 	}
 	message = c.compressor.CompressIfNeeded(ctx, message)
 
-	// 添加系统提示词
-	message = append(message, c.manager.SystemPrompt()...)
+	// 检查是否已有系统提示词，避免重复添加
+	hasSystemPrompt := false
+	for _, msg := range message {
+		if msg.Role == llms.ChatMessageTypeSystem {
+			hasSystemPrompt = true
+			break
+		}
+	}
+
+	// 只在首次调用时添加系统提示词
+	if !hasSystemPrompt {
+		message = append(message, c.manager.SystemPrompt()...)
+	}
 
 	resp, err := c.llm.GenerateContent(ctx, message, llms.WithTools(tools.GetEllTools()))
 	if err != nil {

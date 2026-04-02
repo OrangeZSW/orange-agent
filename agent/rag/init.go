@@ -12,49 +12,57 @@ import (
 
 var (
 	globalRetriever *CodeRetriever
-	once            sync.Once
-	mu              sync.RWMutex
+	initMu          sync.RWMutex
 	log             = logger.GetLogger()
 )
 
 // GetRetriever 获取全局代码检索器实例
 func GetRetriever() *CodeRetriever {
+	initMu.RLock()
+	defer initMu.RUnlock()
 	return globalRetriever
 }
 
 // InitializeWithRedis 使用Redis初始化代码检索器
 func InitializeWithRedis(config *RedisConfig) error {
-	var initErr error
-	once.Do(func() {
-		// 创建Redis向量存储
-		store, err := NewRedisVectorStore(config)
-		if err != nil {
-			initErr = err
-			return
-		}
+	initMu.Lock()
+	defer initMu.Unlock()
 
-		// 创建嵌入器
-		embedder := NewSimpleEmbedder()
+	// 如果已经初始化成功，跳过
+	if globalRetriever != nil {
+		log.Info("向量存储已初始化，跳过")
+		return nil
+	}
 
-		// 创建索引器
-		indexer := NewCodeIndexer(store, embedder)
+	log.Info("正在初始化Redis向量存储: %s:%d", config.Host, config.Port)
 
-		// 创建检索器
-		globalRetriever = NewCodeRetriever(indexer, embedder)
+	// 创建Redis向量存储
+	store, err := NewRedisVectorStore(config, VectorDim)
+	if err != nil {
+		return fmt.Errorf("Redis连接失败: %v", err)
+	}
 
-		log.Info("Redis向量存储初始化成功")
-	})
+	// 创建嵌入器
+	embedder := NewSimpleEmbedder()
 
-	return initErr
+	// 创建索引器
+	indexer := NewCodeIndexer(store, embedder)
+
+	// 创建检索器
+	globalRetriever = NewCodeRetriever(indexer, embedder)
+
+	log.Info("Redis向量存储初始化成功")
+	return nil
 }
 
 // InitializeIndex 初始化代码索引
 func InitializeIndex(ctx context.Context, projectRoot string) error {
-	mu.Lock()
-	defer mu.Unlock()
+	initMu.RLock()
+	retriever := globalRetriever
+	initMu.RUnlock()
 
-	if globalRetriever == nil {
-		return fmt.Errorf("向量存储未初始化，请先调用 InitializeWithRedis")
+	if retriever == nil {
+		return fmt.Errorf("向量存储未初始化，请检查Redis连接配置是否正确")
 	}
 
 	log.Info("开始初始化代码索引，项目根目录: %s", projectRoot)
@@ -87,20 +95,25 @@ func InitializeIndex(ctx context.Context, projectRoot string) error {
 	})
 
 	if err != nil {
-		return err
+		return fmt.Errorf("扫描文件失败: %v", err)
 	}
 
+	log.Info("扫描到 %d 个代码文件", len(allTexts))
+
 	// 构建词汇表
-	if embedder, ok := globalRetriever.embedder.(*SimpleEmbedder); ok {
+	if embedder, ok := retriever.embedder.(*SimpleEmbedder); ok {
 		embedder.BuildVocabulary(allTexts)
 	}
 
 	// 索引目录
-	if err := globalRetriever.IndexDirectory(ctx, projectRoot); err != nil {
-		return err
+	if err := retriever.IndexDirectory(ctx, projectRoot); err != nil {
+		return fmt.Errorf("索引失败: %v", err)
 	}
 
-	size, _ := globalRetriever.GetIndexSize(ctx)
+	size, err := retriever.GetIndexSize(ctx)
+	if err != nil {
+		log.Warn("获取索引大小失败: %v", err)
+	}
 	log.Info("代码索引初始化完成，共 %d 个代码块", size)
 	return nil
 }
