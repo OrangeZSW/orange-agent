@@ -71,7 +71,6 @@ func initSkills() []Skill {
 					log.Error("解析yaml失败.路径:%s,err:%v", item.Path, err)
 					continue
 				}
-				skill.Content = parts[2]
 				skills = append(skills, skill)
 			}
 		}
