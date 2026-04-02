@@ -81,7 +81,7 @@ func (ts *TaskSplitter) Split(ctx context.Context, task *domain.Task, analysis *
 		Subtasks []struct {
 			Description    string                 `json:"description"`
 			Input          map[string]interface{} `json:"input"`
-			Dependencies   []string               `json:"dependencies"`
+			Dependencies   []interface{}          `json:"dependencies"` // 改为interface{}兼容数字和字符串类型
 			ExecutionOrder int                    `json:"execution_order"`
 			CanParallel    bool                   `json:"can_parallel"`
 		} `json:"subtasks"`
@@ -96,12 +96,18 @@ func (ts *TaskSplitter) Split(ctx context.Context, task *domain.Task, analysis *
 	// 创建SubTask对象
 	var subTasks []*domain.SubTask
 	for i, st := range result.Subtasks {
+		// 转换依赖为字符串数组，兼容数字类型的依赖
+		var deps []string
+		for _, dep := range st.Dependencies {
+			deps = append(deps, fmt.Sprintf("%v", dep))
+		}
+
 		subTask := &domain.SubTask{
 			Description:    st.Description,
 			Status:         domain.StatusPending,
 			Input:          st.Input,
 			TaskID:         task.ID,
-			Dependencies:   st.Dependencies,
+			Dependencies:   deps,
 			ExecutionOrder: st.ExecutionOrder,
 			CanParallel:    st.CanParallel,
 			IsDAGNode:      len(st.Dependencies) > 0, // 如果有依赖关系，标记为DAG节点

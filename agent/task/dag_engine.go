@@ -67,7 +67,25 @@ func (de *DAGEngine) BuildDAG(subTasks []*domain.SubTask) (*domain.DependencyGra
 	// 创建节点映射
 	nodeMap := make(map[string]*domain.DAGNode)
 	for i, subTask := range subTasks {
+		// 修复点1：检查子任务ID是否为默认值0，避免重复使用默认值
+		if subTask.ID == 0 {
+			return nil, fmt.Errorf("子任务ID不能为默认值0，请确保每个子任务ID全局唯一，子任务描述: %s", subTask.Description)
+		}
+
 		nodeID := fmt.Sprintf("task_%d", subTask.ID)
+
+		// 修复点2：新增重复nodeID校验
+		if _, exists := nodeMap[nodeID]; exists {
+			return nil, fmt.Errorf("检测到重复的节点ID: %s，子任务ID: %d，请确保子任务ID全局唯一", nodeID, subTask.ID)
+		}
+
+		// 修复点3：新增自依赖校验
+		for _, depID := range subTask.Dependencies {
+			if depID == nodeID {
+				return nil, fmt.Errorf("节点 %s 存在自依赖，任务不能依赖自身，子任务描述: %s", nodeID, subTask.Description)
+			}
+		}
+
 		node := &domain.DAGNode{
 			ID:        nodeID,
 			SubTask:   subTask,
@@ -81,6 +99,7 @@ func (de *DAGEngine) BuildDAG(subTasks []*domain.SubTask) (*domain.DependencyGra
 		}
 		dag.Nodes = append(dag.Nodes, node)
 		nodeMap[nodeID] = node
+		logger.Debug("创建DAG节点: %s, 依赖列表: %v", nodeID, subTask.Dependencies)
 	}
 
 	// 创建边
@@ -98,11 +117,17 @@ func (de *DAGEngine) BuildDAG(subTasks []*domain.SubTask) (*domain.DependencyGra
 				DataFlow: "result", // 默认数据流类型
 			}
 			dag.Edges = append(dag.Edges, edge)
+			logger.Debug("创建DAG边: %s -> %s", depID, node.ID)
 		}
 	}
 
 	// 验证DAG是否有环
 	if de.hasCycles(dag) {
+		// 打印所有节点依赖关系方便排查
+		logger.Error("DAG构建失败，存在循环依赖，所有节点依赖关系如下:")
+		for _, node := range dag.Nodes {
+			logger.Error("节点 %s 依赖: %v", node.ID, node.DependsOn)
+		}
 		return nil, fmt.Errorf("依赖图中存在循环依赖")
 	}
 
@@ -121,6 +146,8 @@ func (de *DAGEngine) topologicalSort(dag *domain.DependencyGraph) ([]string, err
 		inDegree[edge.To]++
 	}
 
+	logger.Debug("节点入度统计: %v", inDegree)
+
 	// 初始化队列：入度为0的节点
 	queue := make([]string, 0)
 	for nodeID, degree := range inDegree {
@@ -129,6 +156,8 @@ func (de *DAGEngine) topologicalSort(dag *domain.DependencyGraph) ([]string, err
 		}
 	}
 
+	logger.Debug("初始入度为0的节点: %v", queue)
+
 	// 拓扑排序
 	topology := make([]string, 0, len(dag.Nodes))
 	for len(queue) > 0 {
@@ -136,12 +165,16 @@ func (de *DAGEngine) topologicalSort(dag *domain.DependencyGraph) ([]string, err
 		queue = queue[1:]
 		topology = append(topology, nodeID)
 
+		logger.Debug("处理拓扑节点: %s", nodeID)
+
 		// 减少依赖节点的入度
 		for _, edge := range dag.Edges {
 			if edge.From == nodeID {
 				inDegree[edge.To]--
+				logger.Debug("节点 %s 依赖的节点 %s 已处理，入度减为: %d", edge.To, nodeID, inDegree[edge.To])
 				if inDegree[edge.To] == 0 {
 					queue = append(queue, edge.To)
+					logger.Debug("节点 %s 入度变为0，加入处理队列", edge.To)
 				}
 			}
 		}
@@ -149,6 +182,21 @@ func (de *DAGEngine) topologicalSort(dag *domain.DependencyGraph) ([]string, err
 
 	// 检查是否所有节点都被排序
 	if len(topology) != len(dag.Nodes) {
+		// 找出未被处理的节点
+		var unprocessedNodes []string
+		for nodeID := range inDegree {
+			found := false
+			for _, processedID := range topology {
+				if nodeID == processedID {
+					found = true
+					break
+				}
+			}
+			if !found {
+				unprocessedNodes = append(unprocessedNodes, nodeID)
+			}
+		}
+		logger.Error("拓扑排序失败，存在环，未处理的节点: %v, 剩余入度: %v", unprocessedNodes, inDegree)
 		return nil, fmt.Errorf("图中存在环，无法进行拓扑排序")
 	}
 
@@ -318,23 +366,44 @@ func (de *DAGEngine) detectCycleDFS(nodeID string, dag *domain.DependencyGraph, 
 		}
 	}
 	if node == nil {
+		logger.Warn("检测环时找不到节点: %s", nodeID)
 		return false
 	}
+
+	logger.Debug("开始检测节点环: %s, 依赖: %v", nodeID, node.DependsOn)
 
 	visited[nodeID] = true
 	recStack[nodeID] = true
 
 	// 检查所有依赖
 	for _, depID := range node.DependsOn {
+		logger.Debug("节点 %s 检查依赖 %s", nodeID, depID)
 		if !visited[depID] {
 			if de.detectCycleDFS(depID, dag, visited, recStack) {
+				// 打印环路径
+				var cyclePath []string
+				for n, inStack := range recStack {
+					if inStack {
+						cyclePath = append(cyclePath, n)
+					}
+				}
+				logger.Error("检测到循环依赖! 环路径: %v -> %s", cyclePath, depID)
 				return true
 			}
 		} else if recStack[depID] {
+			// 找到环，打印具体的环信息
+			var cyclePath []string
+			for n, inStack := range recStack {
+				if inStack {
+					cyclePath = append(cyclePath, n)
+				}
+			}
+			logger.Error("检测到循环依赖! 当前节点: %s, 依赖节点: %s 已在递归栈中, 完整环路径: %v -> %s", nodeID, depID, cyclePath, depID)
 			return true
 		}
 	}
 
 	recStack[nodeID] = false
+	logger.Debug("节点 %s 检测完成，无环", nodeID)
 	return false
 }

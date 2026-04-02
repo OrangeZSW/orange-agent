@@ -106,7 +106,7 @@ func (a *agent) TaskChat(ctx context.Context, question string) string {
 	// 4. 执行任务
 	result, err := orchestrator.Execute(ctx, task)
 	if err != nil {
-		fmt.Printf("任务执行失败: %v\n", err)
+		a.log.Error("任务执行失败: %v\n", err)
 		return fmt.Sprintf("任务执行失败%s", err)
 	}
 
