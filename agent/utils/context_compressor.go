@@ -39,8 +39,6 @@ func (c *ContextCompressor) CompressIfNeeded(
 	// 估算当前字符数
 	totalChars := estimateChars(messages)
 
-	c.log.Debug("上下文大小: %d 字符", totalChars)
-
 	if totalChars < CompressThreshold {
 		return messages // 不需要压缩
 	}

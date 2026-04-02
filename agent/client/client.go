@@ -105,7 +105,6 @@ func (c *client) HandleToolCalls(ctx context.Context, message []llms.MessageCont
 		Parts: []llms.ContentPart{},
 	}
 
-	c.log.Info("llm:", resp.Choices[0].Content)
 	toolcalls := resp.Choices[0].ToolCalls
 	if len(toolcalls) > 0 {
 		for _, toolcall := range toolcalls {
