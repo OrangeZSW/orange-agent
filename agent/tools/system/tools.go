@@ -9,7 +9,6 @@ var SystemTools = []common.BaseTool{
 	ProjectRebootTool,
 	LogViewTool,
 	EnvManageTool,
-	TestRunTool,
 	DependencyCheckTool,
 	PerformanceMonitorTool,
 	ApiTesterTool,
