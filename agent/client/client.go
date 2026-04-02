@@ -16,21 +16,19 @@ import (
 )
 
 type client struct {
-	llm              *openai.LLM
-	repo             *repository.Repositories
-	log              *logger.Logger
-	AgentConfig      *domain.AgentConfig
-	manager          interfaces.Manager
-	messageFormatter *utils.ToolMessageFormatter
-	compressor       *utils.ContextCompressor
+	llm         *openai.LLM
+	repo        *repository.Repositories
+	log         *logger.Logger
+	AgentConfig *domain.AgentConfig
+	manager     interfaces.Manager
+	compressor  *utils.ContextCompressor
 }
 
 func NewClient(Manager interfaces.Manager) interfaces.Client {
 	return &client{
-		repo:             resource.GetRepositories(),
-		log:              logger.GetLogger(),
-		manager:          Manager,
-		messageFormatter: utils.NewToolMessageFormatter(),
+		repo:    resource.GetRepositories(),
+		log:     logger.GetLogger(),
+		manager: Manager,
 	}
 }
 
@@ -106,6 +104,8 @@ func (c *client) HandleToolCalls(ctx context.Context, message []llms.MessageCont
 		Role:  llms.ChatMessageTypeAI,
 		Parts: []llms.ContentPart{},
 	}
+
+	c.log.Info("llm:", resp.Choices[0].Content)
 	toolcalls := resp.Choices[0].ToolCalls
 	if len(toolcalls) > 0 {
 		for _, toolcall := range toolcalls {
@@ -117,22 +117,10 @@ func (c *client) HandleToolCalls(ctx context.Context, message []llms.MessageCont
 					Arguments: toolcall.FunctionCall.Arguments,
 				},
 			})
-			startToolMessage := c.messageFormatter.FormatToolCallMessage(
-				toolcall.FunctionCall.Name,
-				toolcall.FunctionCall.Arguments,
-			)
-			c.manager.TeleGramSendMessage(startToolMessage)
 			res, err := tools.GetTools()[toolcall.FunctionCall.Name].Call(ctx, toolcall.FunctionCall.Arguments)
 			if err != nil {
 				c.log.Error("调用工具:%s失败,参数:%.20s,错误:%.50s", toolcall.FunctionCall.Name, toolcall.FunctionCall.Arguments, err)
 				res = "调用工具失败"
-				// 发送美化的工具调用失败消息到Telegram
-				errorMessage := c.messageFormatter.FormatToolErrorMessage(
-					toolcall.FunctionCall.Name,
-					toolcall.FunctionCall.Arguments,
-					err.Error(),
-				)
-				c.manager.TeleGramSendMessage(errorMessage)
 			}
 			toolsMessage.Parts = append(toolsMessage.Parts, llms.ToolCallResponse{
 				ToolCallID: toolcall.ID,
