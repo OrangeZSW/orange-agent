@@ -22,6 +22,7 @@ type client struct {
 	AgentConfig      *domain.AgentConfig
 	manager          interfaces.Manager
 	messageFormatter *utils.ToolMessageFormatter
+	compressor       *utils.ContextCompressor
 }
 
 func NewClient(Manager interfaces.Manager) interfaces.Client {
@@ -49,6 +50,8 @@ func (c *client) getLLM(modelName string) {
 		c.log.Error("创建LLM失败: %v", err)
 	}
 	c.llm = llm
+	// 重置压缩器，使用新的LLM实例
+	c.compressor = utils.NewContextCompressor(c.llm)
 }
 
 func (c *client) Chat(modelName string, message []llms.MessageContent) string {
@@ -66,7 +69,15 @@ func (c *client) Chat(modelName string, message []llms.MessageContent) string {
 }
 
 func (c *client) call(ctx context.Context, message []llms.MessageContent) (*llms.ContentResponse, error) {
+	// 上下文压缩（仅对非系统消息的历史进行压缩）
+	if c.compressor == nil {
+		c.compressor = utils.NewContextCompressor(c.llm)
+	}
+	message = c.compressor.CompressIfNeeded(ctx, message)
+
+	// 添加系统提示词
 	message = append(message, c.manager.SystemPrompt()...)
+
 	resp, err := c.llm.GenerateContent(ctx, message, llms.WithTools(tools.GetEllTools()))
 	if err != nil {
 		return nil, err

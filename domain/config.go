@@ -3,6 +3,7 @@ package domain
 type Config struct {
 	Telegram Telegram       `mapstructure:"telegram"`
 	Database DatabaseConfig `mapstructure:"database"`
+	Redis    RedisConfig    `mapstructure:"redis"`
 	Logger   Logger         `mapstructure:"logger"`
 }
 
@@ -19,6 +20,13 @@ type DatabaseConfig struct {
 	Username string `mapstructure:"username"`
 	Password string `mapstructure:"password"`
 	Database string `mapstructure:"database"`
+}
+
+type RedisConfig struct {
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	Password string `mapstructure:"password"`
+	DB       int    `mapstructure:"db"`
 }
 
 type Logger struct {

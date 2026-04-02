@@ -13,4 +13,6 @@ var SystemTools = []common.BaseTool{
 	PerformanceMonitorTool,
 	ApiTesterTool,
 	WebSearchTool,
+	CodeSearchTool,
+	CodeIndexInitTool,
 }
