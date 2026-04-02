@@ -2,11 +2,11 @@ package manager
 
 import (
 	"orange-agent/agent/interfaces"
+	"orange-agent/agent/tools/skill"
 	"orange-agent/domain"
 	"orange-agent/repository"
 	"orange-agent/repository/resource"
 	"orange-agent/telegram"
-	"orange-agent/utils/file"
 	"orange-agent/utils/logger"
 	"sync"
 
@@ -16,12 +16,6 @@ import (
 var (
 	once sync.Once
 )
-
-type Skill struct {
-	Name        string
-	Description string
-	Content     string
-}
 
 type manager struct {
 	User     *domain.User
@@ -60,15 +54,14 @@ func (r *manager) TeleGramSendMessage(text string) {
 }
 
 func (r *manager) SystemPrompt() []llms.MessageContent {
-	system := ""
-	//当前系统架构
-	agent, err := file.ReadFile("./AGENT.md")
-	if err != nil {
-		r.log.Error("获取系统AGENT.md失败: %v", err)
+	skills := skill.GetSkills()
+	skillsPrompt := []llms.MessageContent{}
+	for _, skill := range skills {
+		skillsPrompt = append(skillsPrompt, llms.TextParts(
+			llms.ChatMessageTypeSystem,
+			"当用户提到的问题中包含以下技能，使用工具读取技能信息，根据技能完成任务。",
+			skill.Name, skill.Description,
+		))
 	}
-	system = string(agent)
-	message := []llms.MessageContent{
-		llms.TextParts(llms.ChatMessageTypeHuman, system),
-	}
-	return message
+	return skillsPrompt
 }
