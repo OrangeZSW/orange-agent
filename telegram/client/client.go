@@ -99,10 +99,8 @@ func (c *client) listenMessage() {
 
 		// 发送响应
 		if menu != nil {
-			c.log.Info("发送带菜单的响应: %s", result)
 			return c.ui.SendMessageWithMenu(t, result, menu)
 		} else {
-			c.log.Info("发送响应: %s", result)
 			c.repo.Memory.UpdateMemory(memory)
 			return c.sendLongMessage(t, result)
 		}
@@ -140,10 +138,8 @@ func (c *client) listenMessage() {
 
 		// 发送响应
 		if menu != nil {
-			c.log.Info("发送带菜单的按钮响应: %s", result)
 			return c.ui.SendMessageWithMenu(t, result, menu)
 		} else {
-			c.log.Info("发送按钮响应: %s", result)
 			return c.sendLongMessage(t, result)
 		}
 	})

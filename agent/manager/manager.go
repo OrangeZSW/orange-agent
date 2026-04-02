@@ -8,16 +8,13 @@ import (
 	"orange-agent/telegram"
 	"orange-agent/utils/file"
 	"orange-agent/utils/logger"
-	"strings"
 	"sync"
 
 	"github.com/tmc/langchaingo/llms"
-	"go.yaml.in/yaml/v3"
 )
 
 var (
-	skills []Skill
-	once   sync.Once
+	once sync.Once
 )
 
 type Skill struct {
@@ -60,31 +57,6 @@ func (r *manager) SaveCallRecord(message []llms.MessageContent, resp *llms.Conte
 
 func (r *manager) TeleGramSendMessage(text string) {
 	r.telegram.SendTeleGramMessage(int64(r.User.TelegramId), text)
-}
-
-func NewSkills() []Skill {
-	once.Do(func() {
-		files, err := file.GetFileList("../../")
-		if err != nil {
-			panic(err)
-		}
-		for _, item := range files {
-			var skill Skill
-			if item.Name == "SKILL.md" {
-				content, _ := file.ReadFile(item.Path)
-				parts := strings.SplitN(string(content), "---\n", 3)
-				if len(parts) < 3 {
-					continue
-				}
-				if err := yaml.Unmarshal([]byte(parts[1]), &skill); err != nil {
-					continue
-				}
-				skill.Content = parts[2]
-				skills = append(skills, skill)
-			}
-		}
-	})
-	return skills
 }
 
 func (r *manager) SystemPrompt() []llms.MessageContent {
