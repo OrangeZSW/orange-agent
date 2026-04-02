@@ -15,16 +15,16 @@ import (
 	telebot "gopkg.in/telebot.v3"
 )
 
-const maxMessageLength = 4096 // Telegram单条消息最大长度限制
+const maxMessageLength = 4096
 
 // UIManager 管理Telegram用户界面交互
 type UIManager struct {
-	log           *logger.Logger
-	cm            *command.CommandManager
-	menuManager   *MenuManager
-	answer        interfaces.Ansewer
-	userStates    map[int64]*UserState
-	stateMutex    *sync.RWMutex
+	log         *logger.Logger
+	cm          *command.CommandManager
+	menuManager *MenuManager
+	handler     interfaces.MessageHandler
+	userStates  map[int64]*UserState
+	stateMutex  *sync.RWMutex
 }
 
 // UserState 用户状态
@@ -39,12 +39,12 @@ type UserState struct {
 }
 
 // NewUIManager 创建新的UI管理器
-func NewUIManager(cm *command.CommandManager, answer interfaces.Ansewer) *UIManager {
+func NewUIManager(cm *command.CommandManager, handler interfaces.MessageHandler) *UIManager {
 	return &UIManager{
 		log:         logger.GetLogger(),
 		cm:          cm,
 		menuManager: NewMenuManager(cm),
-		answer:      answer,
+		handler:     handler,
 		userStates:  make(map[int64]*UserState),
 		stateMutex:  &sync.RWMutex{},
 	}
@@ -53,17 +53,20 @@ func NewUIManager(cm *command.CommandManager, answer interfaces.Ansewer) *UIMana
 // GetUserState 获取用户状态
 func (um *UIManager) GetUserState(userID int64) *UserState {
 	um.stateMutex.RLock()
-	defer um.stateMutex.RUnlock()
-	
 	state, exists := um.userStates[userID]
+	um.stateMutex.RUnlock()
+
 	if !exists {
 		state = &UserState{
 			StateData: make(map[string]interface{}),
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
+		um.stateMutex.Lock()
+		um.userStates[userID] = state
+		um.stateMutex.Unlock()
 	}
-	
+
 	return state
 }
 
@@ -71,7 +74,7 @@ func (um *UIManager) GetUserState(userID int64) *UserState {
 func (um *UIManager) UpdateUserState(userID int64, state *UserState) {
 	um.stateMutex.Lock()
 	defer um.stateMutex.Unlock()
-	
+
 	state.UpdatedAt = time.Now()
 	um.userStates[userID] = state
 }
@@ -81,50 +84,40 @@ func (um *UIManager) HandleMessage(ctx context.Context, c telebot.Context, user 
 	userID := c.Sender().ID
 	state := um.GetUserState(userID)
 	state.LastMessage = text
-	
-	// 检查是否为按钮回调
-	if c.Callback() != nil && c.Data() != "" {
-		return um.HandleCallback(ctx, c, user, c.Data())
-	}
-	
+
 	// 检查是否为命令
 	if strings.HasPrefix(text, "/") {
-		// 执行命令
 		result := um.cm.Execute(ctx, c, user, text)
 		state.LastResponse = result
 		state.LastCommand = text
 		um.UpdateUserState(userID, state)
-		
-		// 根据命令类型决定是否显示菜单
+
 		menu := um.getMenuForCommand(text)
 		return result, menu, nil
 	}
-	
+
 	// 检查用户是否在等待参数输入
 	if state.StateData["waiting_for_param"] != nil {
 		cmd := state.StateData["waiting_for_param"].(string)
 		delete(state.StateData, "waiting_for_param")
-		
-		// 执行带参数的命令
+
 		fullCmd := fmt.Sprintf("/%s %s", cmd, text)
 		result := um.cm.Execute(ctx, c, user, fullCmd)
 		state.LastResponse = result
 		state.LastCommand = fullCmd
 		um.UpdateUserState(userID, state)
-		
-		// 返回主菜单
+
 		return result, um.menuManager.GetMainMenu(), nil
 	}
-	
-	// 普通消息，使用AI助手处理 - 转换为 llms.MessageContent
-	messageContent := []llms.MessageContent{
+
+	// 普通消息，使用AI助手处理
+	messages := []llms.MessageContent{
 		llms.TextParts(llms.ChatMessageTypeHuman, text),
 	}
-	result := um.answer.TeleGramChat(ctx, user.ModelName, messageContent)
+	result := um.handler.Handle(ctx, user.ModelName, messages)
 	state.LastResponse = result
 	um.UpdateUserState(userID, state)
-	
-	// 显示主菜单
+
 	return result, um.menuManager.GetMainMenu(), nil
 }
 
@@ -132,24 +125,23 @@ func (um *UIManager) HandleMessage(ctx context.Context, c telebot.Context, user 
 func (um *UIManager) HandleCallback(ctx context.Context, c telebot.Context, user *domain.User, data string) (string, *telebot.ReplyMarkup, error) {
 	userID := c.Sender().ID
 	state := um.GetUserState(userID)
-	
+
 	um.log.Info("处理按钮回调: %s, 用户: %d", data, userID)
-	
+
 	// 处理菜单导航
 	if strings.HasPrefix(data, "menu_") {
 		menu := um.menuManager.GetMenuByData(data)
 		state.LastMenu = data
 		um.UpdateUserState(userID, state)
-		
-		// 返回菜单标题和对应的键盘
+
 		title := um.getMenuTitle(data)
 		return title, menu, nil
 	}
-	
+
 	// 处理命令按钮
 	if strings.HasPrefix(data, "cmd_") {
 		cmd, args := um.menuManager.GetCommandByData(data)
-		
+
 		if len(args) == 0 {
 			// 无参数命令直接执行
 			fullCmd := fmt.Sprintf("/%s", cmd)
@@ -157,119 +149,101 @@ func (um *UIManager) HandleCallback(ctx context.Context, c telebot.Context, user
 			state.LastResponse = result
 			state.LastCommand = fullCmd
 			um.UpdateUserState(userID, state)
-			
-			// 返回结果和主菜单
+
 			return result, um.menuManager.GetMainMenu(), nil
 		} else if args[0] == "prompt" {
 			// 需要参数的命令
 			state.StateData["waiting_for_param"] = cmd
 			um.UpdateUserState(userID, state)
-			
-			// 返回参数提示
+
 			prompt := um.menuManager.GetPromptMessage(cmd)
 			return prompt, nil, nil
 		} else if cmd == "modelset" && len(args) == 1 {
-			// 模型切换命令，直接执行
+			// 模型切换命令
 			fullCmd := fmt.Sprintf("/%s %s", cmd, args[0])
 			result := um.cm.Execute(ctx, c, user, fullCmd)
 			state.LastResponse = result
 			state.LastCommand = fullCmd
 			um.UpdateUserState(userID, state)
-			
-			// 返回切换结果和模型菜单
+
 			return result, um.menuManager.GetModelMenu(), nil
 		}
 	}
-	
+
 	// 默认返回主菜单
 	return "请选择操作：", um.menuManager.GetMainMenu(), nil
 }
 
 // getMenuTitle 获取菜单标题
 func (um *UIManager) getMenuTitle(menuData string) string {
-	switch menuData {
-	case "menu_main":
-		return "🤖 *Orange Agent 主菜单*\n\n请选择要执行的操作："
-	case "menu_file":
-		return "📁 *文件操作*\n\n选择文件操作："
-	case "menu_git":
-		return "🔧 *Git操作*\n\n选择Git操作："
-	case "menu_project":
-		return "🏗️ *项目管理*\n\n选择项目操作："
-	case "menu_db":
-		return "🗄️ *数据库操作*\n\n选择数据库操作："
-	case "menu_agent":
-		return "🤖 *Agent管理*\n\n选择Agent操作："
-	case "menu_system":
-		return "⚙️ *系统工具*\n\n选择系统操作："
-	case "menu_tools":
-		return "🛠️ *系统工具*\n\n选择系统操作："
-	case "menu_model":
-		return "🤖 *模型管理*\n\n选择模型操作："
-	case "menu_help":
-		return "❓ *帮助中心*\n\n选择帮助内容："
-	default:
-		return "请选择操作："
+	titles := map[string]string{
+		"menu_main":    "🤖 *Orange Agent 主菜单*\n\n请选择要执行的操作：",
+		"menu_file":    "📁 *文件操作*\n\n选择文件操作：",
+		"menu_git":     "🔧 *Git操作*\n\n选择Git操作：",
+		"menu_project": "🏗️ *项目管理*\n\n选择项目操作：",
+		"menu_db":      "🗄️ *数据库操作*\n\n选择数据库操作：",
+		"menu_agent":   "🤖 *Agent管理*\n\n选择Agent操作：",
+		"menu_system":  "⚙️ *系统工具*\n\n选择系统操作：",
+		"menu_tools":   "🛠️ *系统工具*\n\n选择系统操作：",
+		"menu_model":   "🤖 *模型管理*\n\n选择模型操作：",
+		"menu_help":    "❓ *帮助中心*\n\n选择帮助内容：",
 	}
+
+	if title, ok := titles[menuData]; ok {
+		return title
+	}
+	return "请选择操作："
 }
 
 // getMenuForCommand 根据命令获取对应的菜单
 func (um *UIManager) getMenuForCommand(cmd string) *telebot.ReplyMarkup {
-	// 根据命令类型返回相应的菜单
-	if strings.Contains(cmd, "/list") || strings.Contains(cmd, "/read") || strings.Contains(cmd, "/search") {
+	cmdPrefix := strings.SplitN(cmd, " ", 2)[0]
+
+	switch {
+	case strings.HasPrefix(cmdPrefix, "/list") || strings.HasPrefix(cmdPrefix, "/read") || strings.HasPrefix(cmdPrefix, "/search"):
 		return um.menuManager.GetFileMenu()
-	} else if strings.Contains(cmd, "/git") || strings.Contains(cmd, "/commit") || strings.Contains(cmd, "/push") {
+	case strings.HasPrefix(cmdPrefix, "/git") || strings.HasPrefix(cmdPrefix, "/commit") || strings.HasPrefix(cmdPrefix, "/push"):
 		return um.menuManager.GetGitMenu()
-	} else if strings.Contains(cmd, "/build") || strings.Contains(cmd, "/test") || strings.Contains(cmd, "/reboot") {
+	case strings.HasPrefix(cmdPrefix, "/build") || strings.HasPrefix(cmdPrefix, "/test") || strings.HasPrefix(cmdPrefix, "/reboot"):
 		return um.menuManager.GetProjectMenu()
-	} else if strings.Contains(cmd, "/db") {
+	case strings.HasPrefix(cmdPrefix, "/db"):
 		return um.menuManager.GetDatabaseMenu()
-	} else if strings.Contains(cmd, "/agent") {
+	case strings.HasPrefix(cmdPrefix, "/agent"):
 		return um.menuManager.GetAgentMenu()
-	} else if strings.Contains(cmd, "/model") {
+	case strings.HasPrefix(cmdPrefix, "/model"):
 		return um.menuManager.GetModelMenu()
-	} else if strings.Contains(cmd, "/help") || strings.Contains(cmd, "/status") || strings.Contains(cmd, "/tools") {
+	default:
 		return um.menuManager.GetMainMenu()
 	}
-	
+}
+
+// GetMainMenu 获取主菜单
+func (um *UIManager) GetMainMenu() *telebot.ReplyMarkup {
 	return um.menuManager.GetMainMenu()
 }
 
-// SendMessageWithMenu 发送带菜单的消息（支持长消息拆分）
+// GetFileMenu 获取文件菜单
+func (um *UIManager) GetFileMenu() *telebot.ReplyMarkup {
+	return um.menuManager.GetFileMenu()
+}
+
+// SendMessageWithMenu 发送带菜单的消息
 func (um *UIManager) SendMessageWithMenu(c telebot.Context, text string, menu *telebot.ReplyMarkup) error {
-	if len(text) <= maxMessageLength {
-		if menu != nil {
-			return c.Reply(text, menu, telebot.ModeMarkdown)
-		}
-		return c.Reply(text, telebot.ModeMarkdown)
-	}
+	chunks := splitText(text, maxMessageLength)
 
-	// 拆分文本为多个块
-	var chunks []string
-	for i := 0; i < len(text); i += maxMessageLength {
-		end := i + maxMessageLength
-		if end > len(text) {
-			end = len(text)
-		}
-		chunks = append(chunks, text[i:end])
-	}
-
-	// 逐个发送消息块，最后一块带菜单
 	for i, chunk := range chunks {
 		var err error
-		if i == len(chunks)-1 {
-			// 最后一条消息带上菜单
-			if menu != nil {
-				err = c.Reply(chunk, menu, telebot.ModeMarkdown)
-			} else {
-				err = c.Reply(chunk, telebot.ModeMarkdown)
-			}
+		if i == len(chunks)-1 && menu != nil {
+			err = c.Reply(chunk, menu, telebot.ModeMarkdown)
 		} else {
-			// 前面的消息只发文本
-			err = c.Reply(chunk+"\n...(下一部分)", telebot.ModeMarkdown)
+			suffix := "\n...(下一部分)"
+			if i == len(chunks)-1 {
+				suffix = ""
+			}
+			err = c.Reply(chunk+suffix, telebot.ModeMarkdown)
 		}
 		if err != nil {
-			um.log.Error("发送带菜单的消息块失败: %v", err)
+			um.log.Error("发送消息失败: %v", err)
 			return err
 		}
 	}
@@ -280,7 +254,7 @@ func (um *UIManager) SendMessageWithMenu(c telebot.Context, text string, menu *t
 func (um *UIManager) CleanupOldStates(maxAge time.Duration) {
 	um.stateMutex.Lock()
 	defer um.stateMutex.Unlock()
-	
+
 	now := time.Now()
 	for userID, state := range um.userStates {
 		if now.Sub(state.UpdatedAt) > maxAge {
@@ -289,43 +263,19 @@ func (um *UIManager) CleanupOldStates(maxAge time.Duration) {
 	}
 }
 
-// 添加公共方法以暴露菜单管理器的方法
-func (um *UIManager) GetMenuManager() *telebot.ReplyMarkup {
-	return um.menuManager.GetMainMenu()
-}
+// splitText 拆分文本
+func splitText(text string, maxLen int) []string {
+	if len(text) <= maxLen {
+		return []string{text}
+	}
 
-func (um *UIManager) GetFileMenu() *telebot.ReplyMarkup {
-	return um.menuManager.GetFileMenu()
-}
-
-func (um *UIManager) GetGitMenu() *telebot.ReplyMarkup {
-	return um.menuManager.GetGitMenu()
-}
-
-func (um *UIManager) GetProjectMenu() *telebot.ReplyMarkup {
-	return um.menuManager.GetProjectMenu()
-}
-
-func (um *UIManager) GetDatabaseMenu() *telebot.ReplyMarkup {
-	return um.menuManager.GetDatabaseMenu()
-}
-
-func (um *UIManager) GetAgentMenu() *telebot.ReplyMarkup {
-	return um.menuManager.GetAgentMenu()
-}
-
-func (um *UIManager) GetSystemMenu() *telebot.ReplyMarkup {
-	return um.menuManager.GetSystemMenu()
-}
-
-func (um *UIManager) GetModelMenu() *telebot.ReplyMarkup {
-	return um.menuManager.GetModelMenu()
-}
-
-func (um *UIManager) GetHelpMenu() *telebot.ReplyMarkup {
-	return um.menuManager.GetHelpMenu()
-}
-
-func (um *UIManager) GetToolsMenu() *telebot.ReplyMarkup {
-	return um.menuManager.GetSystemMenu()
+	var chunks []string
+	for i := 0; i < len(text); i += maxLen {
+		end := i + maxLen
+		if end > len(text) {
+			end = len(text)
+		}
+		chunks = append(chunks, text[i:end])
+	}
+	return chunks
 }

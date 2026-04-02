@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"orange-agent/agent/interfaces"
 	"orange-agent/agent/tools"
-	"orange-agent/agent/utils"
+	agentutils "orange-agent/agent/utils"
 	"orange-agent/domain"
 	"orange-agent/repository"
 	"orange-agent/repository/resource"
@@ -19,26 +19,30 @@ type client struct {
 	llm         *openai.LLM
 	repo        *repository.Repositories
 	log         *logger.Logger
-	AgentConfig *domain.AgentConfig
+	agentConfig *domain.AgentConfig
 	manager     interfaces.Manager
-	compressor  *utils.ContextCompressor
+	compressor  *agentutils.ContextCompressor
 }
 
-func NewClient(Manager interfaces.Manager) interfaces.Client {
+// NewClient 创建Agent客户端
+func NewClient(mgr interfaces.Manager) interfaces.Client {
 	return &client{
 		repo:    resource.GetRepositories(),
 		log:     logger.GetLogger(),
-		manager: Manager,
+		manager: mgr,
 	}
 }
 
-func (c *client) getLLM(modelName string) {
+// getLLM 获取LLM实例
+func (c *client) getLLM(modelName string) error {
 	config, err := c.repo.AgentConfig.GetAgentConfigByModel(modelName)
-	c.AgentConfig = config
 	if err != nil {
 		c.log.Error("获取模型配置失败: %v", err)
+		return err
 	}
+	c.agentConfig = config
 	c.log.Info("provider:[%-10s] model:[%-10s]", config.Name, modelName)
+
 	llm, err := openai.New(
 		openai.WithToken(config.Token),
 		openai.WithBaseURL(config.BaseUrl),
@@ -46,57 +50,64 @@ func (c *client) getLLM(modelName string) {
 	)
 	if err != nil {
 		c.log.Error("创建LLM失败: %v", err)
+		return err
 	}
 	c.llm = llm
-	// 重置压缩器，使用新的LLM实例
-	c.compressor = utils.NewContextCompressor(c.llm)
+	c.compressor = agentutils.NewContextCompressor(c.llm)
+	return nil
 }
 
-func (c *client) Chat(modelName string, message []llms.MessageContent) string {
-	ctx := context.Background()
-	c.getLLM(modelName)
-	resp, err := c.call(ctx, message)
-	if err != nil {
-		return fmt.Sprintf("调用LLM失败:%v", err)
-	}
-	if len(resp.Choices[0].ToolCalls) > 0 {
-		return c.HandleToolCalls(ctx, message, resp)
+// Chat 与AI模型对话
+func (c *client) Chat(modelName string, messages []llms.MessageContent) string {
+	if err := c.getLLM(modelName); err != nil {
+		return fmt.Sprintf("初始化LLM失败: %v", err)
 	}
 
+	ctx := context.Background()
+	resp, err := c.call(ctx, messages)
+	if err != nil {
+		return fmt.Sprintf("调用LLM失败: %v", err)
+	}
+
+	if len(resp.Choices[0].ToolCalls) > 0 {
+		return c.handleToolCalls(ctx, messages, resp)
+	}
 	return resp.Choices[0].Content
 }
 
-func (c *client) call(ctx context.Context, message []llms.MessageContent) (*llms.ContentResponse, error) {
-	// 上下文压缩（仅对非系统消息的历史进行压缩）
+// call 调用LLM
+func (c *client) call(ctx context.Context, messages []llms.MessageContent) (*llms.ContentResponse, error) {
+	// 上下文压缩
 	if c.compressor == nil {
-		c.compressor = utils.NewContextCompressor(c.llm)
+		c.compressor = agentutils.NewContextCompressor(c.llm)
 	}
-	message = c.compressor.CompressIfNeeded(ctx, message)
+	messages = c.compressor.CompressIfNeeded(ctx, messages)
 
 	// 检查是否已有系统提示词，避免重复添加
 	hasSystemPrompt := false
-	for _, msg := range message {
+	for _, msg := range messages {
 		if msg.Role == llms.ChatMessageTypeSystem {
 			hasSystemPrompt = true
 			break
 		}
 	}
-
 	// 只在首次调用时添加系统提示词
 	if !hasSystemPrompt {
-		message = append(message, c.manager.SystemPrompt()...)
+		messages = append(messages, c.manager.SystemPrompt()...)
 	}
 
-	resp, err := c.llm.GenerateContent(ctx, message, llms.WithTools(tools.GetEllTools()))
+	resp, err := c.llm.GenerateContent(ctx, messages, llms.WithTools(tools.GetEllTools()))
 	if err != nil {
 		return nil, err
 	}
-	c.manager.SaveCallRecord(message, resp, c.AgentConfig)
+
+	c.manager.SaveCallRecord(messages, resp, c.agentConfig)
 	return resp, nil
 }
 
-func (c *client) HandleToolCalls(ctx context.Context, message []llms.MessageContent, resp *llms.ContentResponse) string {
-	toolsMessage := llms.MessageContent{
+// handleToolCalls 处理工具调用
+func (c *client) handleToolCalls(ctx context.Context, messages []llms.MessageContent, resp *llms.ContentResponse) string {
+	toolMessages := llms.MessageContent{
 		Role:  llms.ChatMessageTypeTool,
 		Parts: []llms.ContentPart{},
 	}
@@ -105,37 +116,40 @@ func (c *client) HandleToolCalls(ctx context.Context, message []llms.MessageCont
 		Parts: []llms.ContentPart{},
 	}
 
-	toolcalls := resp.Choices[0].ToolCalls
-	if len(toolcalls) > 0 {
-		for _, toolcall := range toolcalls {
-			aiMessage.Parts = append(aiMessage.Parts, llms.ToolCall{
-				ID:   toolcall.ID,
-				Type: toolcall.Type,
-				FunctionCall: &llms.FunctionCall{
-					Name:      toolcall.FunctionCall.Name,
-					Arguments: toolcall.FunctionCall.Arguments,
-				},
-			})
-			res, err := tools.GetTools()[toolcall.FunctionCall.Name].Call(ctx, toolcall.FunctionCall.Arguments)
-			if err != nil {
-				c.log.Error("调用工具:%s失败,参数:%.20s,错误:%.50s", toolcall.FunctionCall.Name, toolcall.FunctionCall.Arguments, err)
-				res = "调用工具失败"
-			}
-			toolsMessage.Parts = append(toolsMessage.Parts, llms.ToolCallResponse{
-				ToolCallID: toolcall.ID,
-				Content:    res,
-				Name:       toolcall.FunctionCall.Name,
-			})
+	for _, toolCall := range resp.Choices[0].ToolCalls {
+		aiMessage.Parts = append(aiMessage.Parts, llms.ToolCall{
+			ID:   toolCall.ID,
+			Type: toolCall.Type,
+			FunctionCall: &llms.FunctionCall{
+				Name:      toolCall.FunctionCall.Name,
+				Arguments: toolCall.FunctionCall.Arguments,
+			},
+		})
+
+		// 执行工具
+		c.log.Info("调用工具:%s,参数:```%s```", toolCall.FunctionCall.Name, toolCall.FunctionCall.Arguments)
+		result, err := tools.GetTools()[toolCall.FunctionCall.Name].Call(ctx, toolCall.FunctionCall.Arguments)
+		if err != nil {
+			c.log.Error("调用工具:%s失败,参数:%.20s,错误:%.50s", toolCall.FunctionCall.Name, toolCall.FunctionCall.Arguments, err)
+			result = "调用工具失败"
 		}
+
+		toolMessages.Parts = append(toolMessages.Parts, llms.ToolCallResponse{
+			ToolCallID: toolCall.ID,
+			Content:    result,
+			Name:       toolCall.FunctionCall.Name,
+		})
 	}
-	message = append(message, aiMessage)
-	message = append(message, toolsMessage)
-	resp, err := c.call(ctx, message)
+
+	messages = append(messages, aiMessage, toolMessages)
+
+	resp, err := c.call(ctx, messages)
 	if err != nil {
-		return fmt.Sprintf("工具调用中-调用LLM失败:%v", err)
+		return fmt.Sprintf("工具调用中-调用LLM失败: %v", err)
 	}
+
 	if len(resp.Choices[0].ToolCalls) > 0 {
-		return c.HandleToolCalls(ctx, message, resp)
+		return c.handleToolCalls(ctx, messages, resp)
 	}
 	return resp.Choices[0].Content
 }

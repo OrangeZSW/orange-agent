@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	teleGram interfaces.Telegram
+	instance interfaces.Telegram
 	once     sync.Once
 )
 
@@ -16,30 +16,39 @@ type telegram struct {
 	client interfaces.Client
 }
 
+// NewTelegram 创建Telegram实例（单例模式）
 func NewTelegram() interfaces.Telegram {
 	once.Do(func() {
-		teleGram = &telegram{}
+		instance = &telegram{}
 	})
-	return teleGram
+	return instance
 }
 
-func (t *telegram) InitTelegram(config *domain.Telegram, answer interfaces.Ansewer) interfaces.Client {
-	client := client.NewClient(answer)
-	client.Init(config)
-	t.client = client
-	return client
+// Init 初始化Telegram机器人
+func (t *telegram) Init(config *domain.Telegram, handler interfaces.MessageHandler) interfaces.Client {
+	c := client.NewClient(handler)
+	c.Init(config)
+	t.client = c
+	return c
 }
 
+// Start 启动机器人
 func (t *telegram) Start() {
 	if t.client != nil {
 		t.client.Start()
 	}
 }
 
-func (t *telegram) SendTeleGramMessage(telegramId int64, text string) {
-	t.client.SendMessage(telegramId, text)
+// Stop 停止机器人
+func (t *telegram) Stop() {
+	if t.client != nil {
+		t.client.Stop()
+	}
 }
 
-func GetTelegram() interfaces.Telegram {
-	return NewTelegram()
+// SendMessage 发送消息给指定用户
+func (t *telegram) SendMessage(telegramId int64, text string) {
+	if t.client != nil {
+		t.client.SendMessage(telegramId, text)
+	}
 }

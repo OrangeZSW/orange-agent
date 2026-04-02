@@ -17,27 +17,30 @@ import (
 	"gopkg.in/telebot.v3"
 )
 
-const maxMessageLength = 4096 // Telegram单条消息最大长度限制
+// MaxMessageLength Telegram单条消息最大长度限制
+const MaxMessageLength = 4096
 
 type client struct {
 	bot     *telebot.Bot
 	log     *logger.Logger
 	repo    *repository.Repositories
-	manager interfaces.Manager
-	answer  interfaces.Ansewer
+	mgr     interfaces.Manager
+	handler interfaces.MessageHandler
 	cmds    *command.CommandManager
-	ui      *ui.UIManager // 添加UI管理器
+	ui      *ui.UIManager
 }
 
-func NewClient(answer interfaces.Ansewer) interfaces.Client {
+// NewClient 创建Telegram客户端
+func NewClient(handler interfaces.MessageHandler) interfaces.Client {
 	return &client{
 		log:     logger.GetLogger(),
 		repo:    resource.GetRepositories(),
-		manager: manager.NewManager(),
-		answer:  answer,
+		mgr:     manager.NewManager(),
+		handler: handler,
 	}
 }
 
+// Init 初始化客户端
 func (c *client) Init(config *domain.Telegram) {
 	pref := &telebot.Settings{
 		Token:  config.BotToken,
@@ -45,7 +48,8 @@ func (c *client) Init(config *domain.Telegram) {
 	}
 	bot, err := telebot.NewBot(*pref)
 	if err != nil {
-		c.log.Error("Failed to create bot: %v", err)
+		c.log.Error("创建Bot失败: %v", err)
+		return
 	}
 	c.bot = bot
 
@@ -53,100 +57,104 @@ func (c *client) Init(config *domain.Telegram) {
 	c.cmds = command.NewCommandManager(c.repo)
 
 	// 初始化UI管理器
-	c.ui = ui.NewUIManager(c.cmds, c.answer)
+	c.ui = ui.NewUIManager(c.cmds, c.handler)
 
-	c.listenMessage()
+	c.registerHandlers()
 }
 
+// Start 启动机器人
 func (c *client) Start() {
+	if c.bot == nil {
+		c.log.Error("Bot未初始化")
+		return
+	}
 	c.log.Info("Telegram Bot 已启动")
 	c.bot.Start()
 }
 
+// Stop 停止机器人
 func (c *client) Stop() {
-	c.log.Info("Telegram Bot 已停止")
-	c.bot.Stop()
+	if c.bot != nil {
+		c.log.Info("Telegram Bot 已停止")
+		c.bot.Stop()
+	}
 }
 
-// 监听消息
-func (c *client) listenMessage() {
-	// 处理所有文本消息
-	c.bot.Handle(telebot.OnText, func(t telebot.Context) error {
-		telegramId := t.Sender().ID
-		name := t.Sender().Username
-		user := c.manager.GetUser(telegramId, name)
-		messageText := t.Text()
+// SendMessage 发送消息给指定用户
+func (c *client) SendMessage(telegramId int64, text string) {
+	if c.bot == nil {
+		return
+	}
 
-		c.log.Info("Telegram收到消息: %s, 用户: %d", messageText, telegramId)
+	recipient := &telebot.User{ID: telegramId}
+	chunks := splitMessage(text, MaxMessageLength)
 
-		// 先将用户信息存入上下文，再传给后续处理
-		ctx := utils.WithUser(context.Background(), user)
-
-		// 使用UI管理器处理消息
-		result, menu, err := c.ui.HandleMessage(ctx, t, user, messageText)
-		if err != nil {
-			c.log.Error("UI处理消息失败: %v", err)
-			return t.Reply("❌ 处理消息时出错", telebot.ModeMarkdown)
+	for i, chunk := range chunks {
+		sendText := chunk
+		if i < len(chunks)-1 {
+			sendText += "\n...(下一部分)"
 		}
-
-		// 记录到内存
-		memory := &domain.Memory{
-			UserId:       user.ID,
-			UserQuestion: messageText,
-			AgentAnswer:  result,
+		if _, err := c.bot.Send(recipient, sendText, telebot.ModeMarkdown); err != nil {
+			c.log.Error("发送消息失败: %v", err)
 		}
-		c.repo.Memory.CreateMemory(memory)
+	}
+}
 
-		// 发送响应
-		if menu != nil {
-			return c.ui.SendMessageWithMenu(t, result, menu)
-		} else {
-			c.repo.Memory.UpdateMemory(memory)
-			return c.sendLongMessage(t, result)
-		}
-	})
+// registerHandlers 注册消息处理器
+func (c *client) registerHandlers() {
+	c.bot.Handle(telebot.OnText, c.handleTextMessage)
+	c.bot.Handle(telebot.OnCallback, c.handleCallback)
+	c.bot.Handle("/start", c.handleStart)
+	c.bot.Handle("/help", c.handleHelp)
+	c.bot.Handle("/list", c.handleList)
+	c.bot.Handle("/status", c.handleStatus)
+}
 
-	// 处理按钮回调
-	c.bot.Handle(telebot.OnCallback, func(t telebot.Context) error {
-		telegramId := t.Sender().ID
-		name := t.Sender().Username
-		user := c.manager.GetUser(telegramId, name)
-		data := t.Data()
+// handleTextMessage 处理文本消息
+func (c *client) handleTextMessage(t telebot.Context) error {
+	user := c.getUser(t)
+	messageText := t.Text()
+	c.log.Info("Telegram收到消息: %s, 用户: %d", messageText, user.TelegramId)
 
-		c.log.Info("Telegram收到按钮回调: %s, 用户: %d", data, telegramId)
+	ctx := utils.WithUser(context.Background(), user)
+	result, menu, err := c.ui.HandleMessage(ctx, t, user, messageText)
+	if err != nil {
+		c.log.Error("处理消息失败: %v", err)
+		return t.Reply("❌ 处理消息时出错", telebot.ModeMarkdown)
+	}
 
-		// 先将用户信息存入上下文，再传给后续处理
-		ctx := utils.WithUser(context.Background(), user)
+	c.saveMemory(user, messageText, result)
 
-		// 使用UI管理器处理回调
-		result, menu, err := c.ui.HandleCallback(ctx, t, user, data)
-		if err != nil {
-			c.log.Error("UI处理回调失败: %v", err)
-			return t.Respond(&telebot.CallbackResponse{
-				Text: "❌ 处理回调时出错",
-			})
-		}
+	if menu != nil {
+		return c.ui.SendMessageWithMenu(t, result, menu)
+	}
+	return c.replyLongMessage(t, result)
+}
 
-		// 记录回调
-		memory := &domain.Memory{
-			UserId:       user.ID,
-			UserQuestion: fmt.Sprintf("[按钮] %s", data),
-			AgentAnswer:  result,
-		}
-		c.repo.Memory.CreateMemory(memory)
-		c.repo.Memory.UpdateMemory(memory)
+// handleCallback 处理按钮回调
+func (c *client) handleCallback(t telebot.Context) error {
+	user := c.getUser(t)
+	data := t.Data()
+	c.log.Info("Telegram收到按钮回调: %s, 用户: %d", data, user.TelegramId)
 
-		// 发送响应
-		if menu != nil {
-			return c.ui.SendMessageWithMenu(t, result, menu)
-		} else {
-			return c.sendLongMessage(t, result)
-		}
-	})
+	ctx := utils.WithUser(context.Background(), user)
+	result, menu, err := c.ui.HandleCallback(ctx, t, user, data)
+	if err != nil {
+		c.log.Error("处理回调失败: %v", err)
+		return t.Respond(&telebot.CallbackResponse{Text: "❌ 处理回调时出错"})
+	}
 
-	// 处理 /start 命令 - 显示主菜单
-	c.bot.Handle("/start", func(t telebot.Context) error {
-		welcomeMsg := `🤖 *欢迎使用 Orange Agent!*
+	c.saveMemory(user, fmt.Sprintf("[按钮] %s", data), result)
+
+	if menu != nil {
+		return c.ui.SendMessageWithMenu(t, result, menu)
+	}
+	return c.replyLongMessage(t, result)
+}
+
+// handleStart 处理/start命令
+func (c *client) handleStart(t telebot.Context) error {
+	welcomeMsg := `🤖 *欢迎使用 Orange Agent!*
 
 我是一个智能开发助手，可以通过点击按钮快速执行操作：
 
@@ -163,105 +171,78 @@ func (c *client) listenMessage() {
 - 某些操作需要输入参数，按照提示输入即可
 - 所有操作历史会被记录`
 
-		menu := c.ui.GetMenuManager() // 使用公共方法获取菜单
-		return t.Reply(welcomeMsg, menu, telebot.ModeMarkdown)
-	})
-
-	// 处理 /help 命令
-	c.bot.Handle("/help", func(t telebot.Context) error {
-		telegramId := t.Sender().ID
-		name := t.Sender().Username
-		user := c.manager.GetUser(telegramId, name)
-		ctx := utils.WithUser(context.Background(), user)
-
-		result := c.cmds.Execute(ctx, t, user, "/help")
-
-		// 返回结果和主菜单
-		menu := c.ui.GetMenuManager() // 使用公共方法获取菜单
-		return t.Reply(result, menu, telebot.ModeMarkdown)
-	})
-
-	// 添加快捷命令的别名处理
-	c.bot.Handle("/list", func(t telebot.Context) error {
-		ctx := context.Background()
-		result := c.cmds.Execute(ctx, t, nil, "/list")
-		menu := c.ui.GetFileMenu() // 使用公共方法获取文件菜单
-		return t.Reply(result, menu, telebot.ModeMarkdown)
-	})
-
-	c.bot.Handle("/status", func(t telebot.Context) error {
-		ctx := context.Background()
-		result := c.cmds.Execute(ctx, t, nil, "/status")
-		menu := c.ui.GetMenuManager() // 使用公共方法获取菜单
-		return t.Reply(result, menu, telebot.ModeMarkdown)
-	})
+	return t.Reply(welcomeMsg, c.ui.GetMainMenu(), telebot.ModeMarkdown)
 }
 
-// 发送长消息，自动拆分超过长度限制的内容
-func (c *client) sendLongMessage(t telebot.Context, text string) error {
-	if len(text) <= maxMessageLength {
-		return t.Reply(text, telebot.ModeMarkdown)
-	}
+// handleHelp 处理/help命令
+func (c *client) handleHelp(t telebot.Context) error {
+	user := c.getUser(t)
+	ctx := utils.WithUser(context.Background(), user)
+	result := c.cmds.Execute(ctx, t, user, "/help")
+	return t.Reply(result, c.ui.GetMainMenu(), telebot.ModeMarkdown)
+}
 
-	// 拆分文本为多个块
-	var chunks []string
-	for i := 0; i < len(text); i += maxMessageLength {
-		end := i + maxMessageLength
-		if end > len(text) {
-			end = len(text)
-		}
-		chunks = append(chunks, text[i:end])
-	}
+// handleList 处理/list命令
+func (c *client) handleList(t telebot.Context) error {
+	user := c.getUser(t)
+	ctx := utils.WithUser(context.Background(), user)
+	result := c.cmds.Execute(ctx, t, user, "/list")
+	return t.Reply(result, c.ui.GetFileMenu(), telebot.ModeMarkdown)
+}
 
-	// 逐个发送消息块
+// handleStatus 处理/status命令
+func (c *client) handleStatus(t telebot.Context) error {
+	user := c.getUser(t)
+	ctx := utils.WithUser(context.Background(), user)
+	result := c.cmds.Execute(ctx, t, user, "/status")
+	return t.Reply(result, c.ui.GetMainMenu(), telebot.ModeMarkdown)
+}
+
+// getUser 获取用户信息
+func (c *client) getUser(t telebot.Context) *domain.User {
+	return c.mgr.GetUser(t.Sender().ID, t.Sender().Username)
+}
+
+// saveMemory 保存对话记录
+func (c *client) saveMemory(user *domain.User, question, answer string) {
+	memory := &domain.Memory{
+		UserId:       user.ID,
+		UserQuestion: question,
+		AgentAnswer:  answer,
+	}
+	if err := c.repo.Memory.CreateMemory(memory); err != nil {
+		c.log.Warn("保存记忆失败: %v", err)
+	}
+}
+
+// replyLongMessage 回复长消息（自动拆分）
+func (c *client) replyLongMessage(t telebot.Context, text string) error {
+	chunks := splitMessage(text, MaxMessageLength)
 	for i, chunk := range chunks {
-		var err error
-		if i == len(chunks)-1 {
-			err = t.Reply(chunk, telebot.ModeMarkdown)
-		} else {
-			err = t.Reply(chunk+"\n...(continued)", telebot.ModeMarkdown)
+		sendText := chunk
+		if i < len(chunks)-1 {
+			sendText += "\n...(continued)"
 		}
-		if err != nil {
-			c.log.Error("发送消息块失败: %v", err)
+		if err := t.Reply(sendText, telebot.ModeMarkdown); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (c *client) SendMessage(telegramId int64, text string) {
-	recipient := &telebot.User{
-		ID: telegramId,
+// splitMessage 拆分消息
+func splitMessage(text string, maxLen int) []string {
+	if len(text) <= maxLen {
+		return []string{text}
 	}
 
-	if len(text) <= maxMessageLength {
-		_, err := c.bot.Send(recipient, text, telebot.ModeMarkdown)
-		if err != nil {
-			c.log.Error("发送消息失败: %v", err)
-		}
-		return
-	}
-
-	// 拆分长消息发送
 	var chunks []string
-	for i := 0; i < len(text); i += maxMessageLength {
-		end := i + maxMessageLength
+	for i := 0; i < len(text); i += maxLen {
+		end := i + maxLen
 		if end > len(text) {
 			end = len(text)
 		}
 		chunks = append(chunks, text[i:end])
 	}
-
-	// 逐个发送消息块
-	for i, chunk := range chunks {
-		sendText := chunk
-		if i != len(chunks)-1 {
-			sendText += "\n...(下一部分)"
-		}
-		_, err := c.bot.Send(recipient, sendText, telebot.ModeMarkdown)
-		if err != nil {
-			c.log.Error("发送消息块失败: %v", err)
-			return
-		}
-	}
+	return chunks
 }

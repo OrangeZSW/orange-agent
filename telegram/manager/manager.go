@@ -10,19 +10,23 @@ import (
 	"github.com/tmc/langchaingo/llms"
 )
 
+const defaultHistoryLimit = 3
+
 type Manager struct {
 	repo *repository.Repositories
 }
 
+// NewManager 创建用户管理器
 func NewManager() interfaces.Manager {
 	return &Manager{
 		repo: resource.GetRepositories(),
 	}
 }
 
+// GetUser 获取或创建用户
 func (m *Manager) GetUser(telegramId int64, name string) *domain.User {
-	user, _ := m.repo.User.GetUserByTelegramId(telegramId)
-	if user == nil {
+	user, err := m.repo.User.GetUserByTelegramId(telegramId)
+	if err != nil || user == nil {
 		user = &domain.User{
 			TelegramId: utils.Int64ToUint(telegramId),
 			Name:       name,
@@ -33,13 +37,21 @@ func (m *Manager) GetUser(telegramId int64, name string) *domain.User {
 	return user
 }
 
-func (m *Manager) GetMessage(id uint, question string) []llms.MessageContent {
-	message := []llms.MessageContent{}
-	memorys, _ := m.repo.Memory.GetMemoryByUserIdAndLimit(id, 3)
-	for _, item := range memorys {
-		message = append(message, llms.TextParts(llms.ChatMessageTypeHuman, item.UserQuestion))
-		message = append(message, llms.TextParts(llms.ChatMessageTypeAI, item.AgentAnswer))
+// GetMessageHistory 获取用户的消息历史
+func (m *Manager) GetMessageHistory(userId uint, limit int) []llms.MessageContent {
+	if limit <= 0 {
+		limit = defaultHistoryLimit
 	}
-	message = append(message, llms.TextParts(llms.ChatMessageTypeHuman, question))
-	return message
+
+	messages := []llms.MessageContent{}
+	memories, err := m.repo.Memory.GetMemoryByUserIdAndLimit(userId, limit)
+	if err != nil {
+		return messages
+	}
+
+	for _, item := range memories {
+		messages = append(messages, llms.TextParts(llms.ChatMessageTypeHuman, item.UserQuestion))
+		messages = append(messages, llms.TextParts(llms.ChatMessageTypeAI, item.AgentAnswer))
+	}
+	return messages
 }

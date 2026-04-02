@@ -16,66 +16,40 @@ import (
 )
 
 var (
-	Agent interfaces.Agent
-	once  sync.Once
+	instance interfaces.Agent
+	once     sync.Once
 )
 
 type agent struct {
-	repo     *repository.Repositories
-	Telegram interfaces.Telegram
-	log      *logger.Logger
+	repo *repository.Repositories
+	log  *logger.Logger
 }
 
+// NewAgent 创建Agent实例（单例模式）
 func NewAgent() interfaces.Agent {
 	once.Do(func() {
-		Agent = &agent{
+		instance = &agent{
 			repo: resource.GetRepositories(),
 			log:  logger.GetLogger(),
 		}
 	})
-	return Agent
+	return instance
 }
 
-func (a *agent) TeleGramChat(ctx context.Context, modelName string, message []llms.MessageContent) string {
-	// agent
+// Handle 实现MessageHandler接口，处理Telegram消息
+func (a *agent) Handle(ctx context.Context, modelName string, messages []llms.MessageContent) string {
 	user, ok := utils.GetUserFromContext(ctx)
 	if user == nil || !ok {
-		a.log.Error("get user from context error")
-		return "get user from context error"
+		a.log.Error("从上下文获取用户失败")
+		return "获取用户信息失败"
 	}
-	client := client.NewClient(manager.NewManager(user))
-	res := client.Chat(modelName, message)
-	return res
+
+	c := client.NewClient(manager.NewManager(user))
+	return c.Chat(modelName, messages)
 }
 
+// Chat 处理通用对话
 func (a *agent) Chat(ctx context.Context, messages []domain.Message) string {
-	// 转换domain.Message为langchaingo的MessageContent
-	var llmMessages []llms.MessageContent
-	for _, msg := range messages {
-		var msgType llms.ChatMessageType
-		switch msg.Role {
-		case "system":
-			msgType = llms.ChatMessageTypeSystem
-		case "user":
-			msgType = llms.ChatMessageTypeHuman
-		case "assistant":
-			msgType = llms.ChatMessageTypeAI
-		default:
-			msgType = llms.ChatMessageTypeHuman
-		}
-		llmMessages = append(llmMessages, llms.TextParts(msgType, msg.Content))
-	}
-
-	// 从上下文中获取用户信息
-	user, falg := utils.GetUserFromContext(ctx)
-	if !falg && user == nil {
-		a.log.Error("get user from context error")
-		return "get user from context error"
-	}
-
-	// 使用现有client进行聊天
-	agentClient := client.NewClient(manager.NewManager(user))
-	result := agentClient.Chat(user.ModelName, llmMessages)
-
-	return result
+	// TODO: 实现通用对话处理
+	return "功能开发中"
 }
