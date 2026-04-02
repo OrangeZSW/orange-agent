@@ -138,9 +138,11 @@ func (ts *TaskSplitter) optimizeDependencies(subTasks []*domain.SubTask) {
 	// 创建索引映射
 	indexMap := make(map[string]string)
 	for i, task := range subTasks {
-		// 使用任务索引作为键
+		// 使用任务索引作为键，支持多种格式
 		indexMap[strconv.Itoa(i)] = fmt.Sprintf("task_%d", task.ID)
+		indexMap[fmt.Sprintf("task_%d", i)] = fmt.Sprintf("task_%d", task.ID)
 		indexMap[fmt.Sprintf("task_%d", i+1)] = fmt.Sprintf("task_%d", task.ID)
+		indexMap[fmt.Sprintf("任务%d", i)] = fmt.Sprintf("task_%d", task.ID)
 		indexMap[fmt.Sprintf("任务%d", i+1)] = fmt.Sprintf("task_%d", task.ID)
 	}
 
