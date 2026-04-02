@@ -61,6 +61,5 @@ func (r *manager) SystemPrompt() []llms.MessageContent {
 		llms.ChatMessageTypeSystem,
 		"当用户提到的问题中包含以下技能，使用工具读取技能信息，根据技能完成任务", fmt.Sprintf("所有的技能:%v", skills),
 	))
-	r.log.Info("技能:%v", skillsPrompt)
 	return skillsPrompt
 }
