@@ -9,23 +9,26 @@ import (
 
 	"orange-agent/domain"
 	"orange-agent/utils/logger"
+	"gorm.io/gorm"
 )
 
 // TaskSplitter 将总任务拆分为多个子任务
 type TaskSplitter struct {
 	taskChat TaskChat
+	log      logger.Logger
 }
 
 // NewTaskSplitter 创建新的任务分割器
 func NewTaskSplitter(taskChat TaskChat) *TaskSplitter {
 	return &TaskSplitter{
 		taskChat: taskChat,
+		log:      *logger.GetLogger(),
 	}
 }
 
 // Split 将总任务拆分为子任务
 func (ts *TaskSplitter) Split(ctx context.Context, task *domain.Task, analysis *AnalysisResult) ([]*domain.SubTask, error) {
-	logger.Info("开始拆分任务: %s", task.Description)
+	ts.log.Info("开始拆分任务: %s", task.Description)
 
 	prompt := fmt.Sprintf(`请将以下总任务拆分为具体的子任务，并以JSON格式返回：
 
@@ -59,6 +62,8 @@ func (ts *TaskSplitter) Split(ctx context.Context, task *domain.Task, analysis *
 4. 输入部分要包含该子任务需要的所有信息
 5. 对于需要顺序执行的子任务，设置can_parallel: false
 6. 通过execution_order字段指定建议的执行顺序
+7. 确保每个子任务都有唯一的索引，用于依赖关系
+}
 
 只返回JSON，不要其他内容。`,
 		task.Description,
@@ -92,6 +97,7 @@ func (ts *TaskSplitter) Split(ctx context.Context, task *domain.Task, analysis *
 	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
 		return nil, fmt.Errorf("解析拆分结果失败: %w", err)
 	}
+	ts.log.Info("拆分结果: %+v", result)
 
 	// 创建SubTask对象
 	var subTasks []*domain.SubTask
@@ -103,6 +109,9 @@ func (ts *TaskSplitter) Split(ctx context.Context, task *domain.Task, analysis *
 		}
 
 		subTask := &domain.SubTask{
+			Model: gorm.Model{
+				ID: uint(i + 1), // 子任务ID从1开始，避免默认值0
+			},
 			Description:    st.Description,
 			Status:         domain.StatusPending,
 			Input:          st.Input,
@@ -124,14 +133,14 @@ func (ts *TaskSplitter) Split(ctx context.Context, task *domain.Task, analysis *
 	// 优化依赖关系：将文本索引转换为实际ID引用
 	ts.optimizeDependencies(subTasks)
 
-	logger.Info("任务拆分完成，共拆分为 %d 个子任务", len(subTasks))
-	logger.Info("子任务依赖关系:")
+	ts.log.Info("任务拆分完成，共拆分为 %d 个子任务", len(subTasks))
+	ts.log.Info("子任务依赖关系:")
 	for i, st := range subTasks {
 		if len(st.Dependencies) > 0 {
-			logger.Info("  任务%d (顺序:%d, 并行:%v) 依赖: %v",
+			ts.log.Info("  任务%d (顺序:%d, 并行:%v) 依赖: %v",
 				i+1, st.ExecutionOrder, st.CanParallel, st.Dependencies)
 		} else {
-			logger.Info("  任务%d (顺序:%d, 并行:%v) 无依赖",
+			ts.log.Info("  任务%d (顺序:%d, 并行:%v) 无依赖",
 				i+1, st.ExecutionOrder, st.CanParallel)
 		}
 	}
