@@ -45,20 +45,6 @@ type VectorStore interface {
 	DeleteFileMeta(ctx context.Context, filePath string) error
 }
 
-// SearchResult 搜索结果
-type SearchResult struct {
-	Chunk Chunk
-	Score float64
-}
-
-// RedisConfig Redis配置
-type RedisConfig struct {
-	Host     string
-	Port     int
-	Password string
-	DB       int
-}
-
 // RedisVectorStore Redis向量存储
 type RedisVectorStore struct {
 	client    *redis.Client
@@ -81,7 +67,6 @@ func NewRedisVectorStore(config *RedisConfig, vectorDim int) (*RedisVectorStore,
 	}
 
 	log := logger.GetLogger()
-	log.Info("Redis Stack连接成功: %s:%d", config.Host, config.Port)
 
 	store := &RedisVectorStore{
 		client:    client,

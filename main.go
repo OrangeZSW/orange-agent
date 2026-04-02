@@ -15,16 +15,16 @@ func main() {
 	logger.InitDefaultLogger(cfg.Logger)
 	resource.GetDataResource().Add(db.InitMysql(&cfg.Database), "mysql")
 
-	// 初始化Redis向量存储
-	ragConfig := &rag.RedisConfig{
+	// 初始化RAG模块
+	if err := rag.Init(&rag.RedisConfig{
 		Host:     cfg.Redis.Host,
 		Port:     cfg.Redis.Port,
 		Password: cfg.Redis.Password,
 		DB:       cfg.Redis.DB,
+	}); err != nil {
+		logger.GetLogger().Warn("RAG模块初始化失败: %v", err)
 	}
-	if err := rag.InitializeWithRedis(ragConfig); err != nil {
-		logger.GetLogger().Warn("Redis向量存储初始化失败: %v，代码搜索功能将不可用", err)
-	}
+
 	// 初始化并启动Telegram
 	tg := telegram.NewTelegram()
 	client := tg.Init(&cfg.Telegram, agent.NewAgent())

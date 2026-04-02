@@ -19,11 +19,6 @@ type CodeIndexer struct {
 	mu       sync.RWMutex
 }
 
-// TextEmbedder 文本嵌入接口
-type TextEmbedder interface {
-	Embed(ctx context.Context, text string) ([]float64, error)
-}
-
 // NewCodeIndexer 创建代码索引器
 func NewCodeIndexer(store VectorStore, embedder TextEmbedder) *CodeIndexer {
 	return &CodeIndexer{

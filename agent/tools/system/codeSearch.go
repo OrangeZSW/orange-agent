@@ -32,24 +32,20 @@ func handlerCodeSearch(ctx context.Context, input string) (string, error) {
 		Query string `json:"query"`
 		TopK  int    `json:"top_k"`
 	}
-	if err := json.Unmarshal([]byte(input), &params); err != nil {
-		return "", err
-	}
+	json.Unmarshal([]byte(input), &params)
 
-	// 设置默认值
 	if params.TopK <= 0 {
 		params.TopK = 5
 	}
 
-	retriever := rag.GetRetriever()
-	chunks, err := retriever.Retrieve(ctx, params.Query, params.TopK)
+	chunks, err := rag.Search(ctx, params.Query, params.TopK)
 	if err != nil {
 		return "", err
 	}
 
 	if len(chunks) == 0 {
-		return "未找到相关代码。可能需要先初始化代码索引，请使用 code_index_init 工具。", nil
+		return "未找到相关代码。请先使用 code_index_init 初始化索引。", nil
 	}
 
-	return retriever.BuildContext(chunks), nil
+	return rag.BuildContext(chunks), nil
 }

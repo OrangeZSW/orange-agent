@@ -10,7 +10,7 @@ import (
 
 var CodeIndexInitTool = common.BaseTool{
 	Name:        "code_index_init",
-	Description: "当文件更新，新增，删除，时执行增量更新，当索引文件不存在时，执行全量更新",
+	Description: "初始化或刷新代码索引。增量模式只处理变化的文件，速度更快。",
 	Parameters: map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
@@ -34,9 +34,7 @@ func handlerCodeIndexInit(ctx context.Context, input string) (string, error) {
 		ProjectRoot string `json:"project_root"`
 		Mode        string `json:"mode"`
 	}
-	if err := json.Unmarshal([]byte(input), &params); err != nil {
-		params.ProjectRoot = "./"
-	}
+	json.Unmarshal([]byte(input), &params)
 
 	if params.ProjectRoot == "" {
 		params.ProjectRoot = "./"
@@ -50,20 +48,19 @@ func handlerCodeIndexInit(ctx context.Context, input string) (string, error) {
 
 	switch params.Mode {
 	case "full":
-		err = rag.InitializeIndex(ctx, params.ProjectRoot)
+		err = rag.IndexFull(ctx, params.ProjectRoot)
 		modeName = "全量重建"
 	case "incremental":
-		err = rag.InitializeIndexIncremental(ctx, params.ProjectRoot)
+		err = rag.IndexIncremental(ctx, params.ProjectRoot)
 		modeName = "增量更新"
 	default:
-		return "", fmt.Errorf("不支持的模式: %s，可选值: full, incremental", params.Mode)
+		return "", fmt.Errorf("不支持的模式: %s", params.Mode)
 	}
 
 	if err != nil {
 		return "", err
 	}
 
-	retriever := rag.GetRetriever()
-	size, _ := retriever.GetIndexSize(ctx)
-	return fmt.Sprintf("代码索引%s完成，共 %d 个代码块。现在可以使用 code_search 搜索代码。", modeName, size), nil
+	size, _ := rag.GetSize(ctx)
+	return fmt.Sprintf("代码索引%s完成，共 %d 个代码块", modeName, size), nil
 }

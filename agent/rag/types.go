@@ -15,3 +15,17 @@ type Chunk struct {
 func (c Chunk) String() string {
 	return fmt.Sprintf("%s:%d-%d", c.FilePath, c.StartLine, c.EndLine)
 }
+
+// SearchResult 搜索结果
+type SearchResult struct {
+	Chunk Chunk
+	Score float64
+}
+
+// RedisConfig Redis配置
+type RedisConfig struct {
+	Host     string
+	Port     int
+	Password string
+	DB       int
+}

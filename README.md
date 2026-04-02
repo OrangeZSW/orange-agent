@@ -113,9 +113,9 @@ CREATE DATABASE `orange-agent` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 ```yaml
 telegram:
-  bot_token: "YOUR_TELEGRAM_BOT_TOKEN"  # 从 @BotFather 获取
-  proxy: "http://127.0.0.1:7897"       # 代理地址（可选）
-  prompt: "promet/telegram.md"          # 系统提示词文件
+  bot_token: "YOUR_TELEGRAM_BOT_TOKEN" # 从 @BotFather 获取
+  proxy: "http://127.0.0.1:7897" # 代理地址（可选）
+  prompt: "promet/telegram.md" # 系统提示词文件
 
 database:
   driver: "mysql"
@@ -133,11 +133,11 @@ database:
 
 logger:
   level: "debug"
-  output: "both"                    # both/file/console
+  output: "both" # both/file/console
   file_path: "./log"
   file_name: "orange-agent.log"
-  max_size: 10                      # MB
-  max_age: 30                       # 天
+  max_size: 10 # MB
+  max_age: 30 # 天
   max_backups: 5
   compress: true
   show_caller: true
@@ -179,13 +179,12 @@ chmod +x start.sh
 ### 管理命令
 
 - `/addAgent <agent_name> <base_url> <token>` - 添加新的 AI 代理
-
   - 示例：`/addAgent OpenAI https://api.openai.com/v1 sk-xxx`
+
 - `/addModel <agent_id> <model_name>` - 为代理添加模型
-
   - 示例：`/addModel 1 gpt-4-turbo`
-- `/switch <agent_id> <model_index>` - 切换到指定代理和模型
 
+- `/switch <agent_id> <model_index>` - 切换到指定代理和模型
   - 示例：`/switch 1 2`
 
 ### 交互使用
@@ -214,6 +213,7 @@ Orange Agent 集成了以下工具：
 - `git_diff` - 查看代码差异
 
 ### 数据库工具
+
 - `database_query` - 执行数据库查询操作（支持SELECT语句）
 - `database_execute` - 执行数据库写操作（支持INSERT、UPDATE、DELETE语句）
 
@@ -229,42 +229,6 @@ Orange Agent 集成了以下工具：
 - `performance_monitor` - 性能监控
 - `api_tester` - API 接口测试
 - `skill` - 获取技能详细信息
-
-### 🌐 联网搜索工具
-
-- `web_search` - 联网搜索功能
-
-**功能特性：**
-
-- 🔍 **搜索引擎搜索**：支持 DuckDuckGo、Google、Bing 搜索
-- 📄 **网页内容抓取**：获取网页正文内容
-- 🚀 **无需 API Key**：DuckDuckGo 搜索无需配置 API 密钥
-- 🌍 **多语言支持**：支持中英文搜索
-
-**使用示例：**
-
-```
-# 搜索关键词
-搜索 "Go 语言教程"
-
-# 抓取网页内容
-抓取 https://example.com 的内容
-
-# 使用不同搜索引擎
-用 Google 搜索 "人工智能最新进展"
-```
-
-**参数说明：**
-
-- `query`: 搜索关键词或 URL
-- `search_type`: 搜索类型
-  - `search`: 搜索引擎搜索
-  - `fetch`: 抓取网页内容
-- `engine`: 搜索引擎（可选，默认 duckduckgo）
-  - `duckduckgo`: DuckDuckGo（推荐，免费）
-  - `google`: Google（需 API Key）
-  - `bing`: Bing（需 API Key）
-- `num_results`: 返回结果数量（默认 5 条，最多 10 条）
 
 ### Agent 管理工具
 
@@ -282,7 +246,7 @@ Orange Agent 集成了以下工具：
 
 ```sql
 -- 示例：添加 OpenAI 代理
-INSERT INTO agent_configs (name, base_url, token, models) 
+INSERT INTO agent_configs (name, base_url, token, models)
 VALUES ('OpenAI', 'https://api.openai.com/v1', 'sk-xxx', '["gpt-3.5-turbo", "gpt-4"]');
 ```
 
@@ -340,19 +304,18 @@ VALUES ('OpenAI', 'https://api.openai.com/v1', 'sk-xxx', '["gpt-3.5-turbo", "gpt
 ### 常见问题
 
 1. **无法连接到 Telegram**
-
    - 检查网络连接和代理设置
    - 确认 Bot Token 是否正确
-2. **数据库连接失败**
 
+2. **数据库连接失败**
    - 检查数据库配置
    - 确认 MySQL 服务正在运行
-3. **AI 调用失败**
 
+3. **AI 调用失败**
    - 检查代理配置和 API 密钥
    - 确认网络可以访问 AI 服务
-4. **联网搜索失败**
 
+4. **联网搜索失败**
    - 检查网络连接
    - 确认可以访问 DuckDuckGo API
    - 如需使用 Google/Bing，需配置相应 API Key
@@ -386,12 +349,14 @@ tail -f log/orange-agent.log
 ## 更新日志
 
 ### v1.4.2 (2026-04-02)
+
 - ✨ **新增技能管理工具**：支持查询技能详细信息，快速了解工具使用方法
 - ⚡ **性能优化**：优化工具调用逻辑，提升响应速度
 - 📚 **完善文档**：更新工具列表说明，补充技能系统功能介绍
 - 🐛 **问题修复**：修复已知的小bug，提升系统稳定性
 
 ### v1.4.1 (2026-03-29)
+
 - ✨ **新增数据库操作工具**：支持数据库查询和写入操作
 - 🐛 **修复拼写错误**：修正 agent/client 目录下文件名错误
 - 📝 **修正配置字段**：将配置中的 `promete` 字段修正为 `prompt`

@@ -14,16 +14,19 @@ const (
 	VectorDim = 256
 )
 
-// SimpleEmbedder 简单的文本嵌入器（基于关键词的TF-IDF）
+// TextEmbedder 文本嵌入接口
+type TextEmbedder interface {
+	// Embed 将文本转换为向量
+	Embed(ctx context.Context, text string) ([]float64, error)
+}
+
+// SimpleEmbedder 简单的文本嵌入器（基于TF-IDF）
 // 适用于小型代码库，无需额外API调用
 type SimpleEmbedder struct {
-	// 词汇表：关键词 -> 索引
 	vocabulary map[string]int
-	// 文档频率：关键词 -> 出现的文档数
-	docFreq map[string]int
-	// 总文档数
-	totalDocs int
-	log       *logger.Logger
+	docFreq    map[string]int
+	totalDocs  int
+	log        *logger.Logger
 }
 
 // NewSimpleEmbedder 创建简单嵌入器
@@ -37,33 +40,19 @@ func NewSimpleEmbedder() *SimpleEmbedder {
 
 // Embed 将文本转换为向量
 func (e *SimpleEmbedder) Embed(ctx context.Context, text string) ([]float64, error) {
-	// 提取关键词
-	keywords := e.extractKeywords(text)
-
-	// 创建向量
+	keywords := extractKeywords(text)
 	vector := make([]float64, VectorDim)
 
-	// 计算TF-IDF并填充向量
 	for _, keyword := range keywords {
 		if idx, exists := e.vocabulary[keyword]; exists {
-			// 简单的TF计算
 			tf := float64(strings.Count(text, keyword)) / float64(len(text))
-
-			// 简单的IDF计算
 			df := float64(e.docFreq[keyword])
 			idf := math.Log(float64(e.totalDocs+1) / (df + 1))
-
-			// TF-IDF
-			tfidf := tf * idf
-
-			// 将TF-IDF值放入向量的对应位置
-			vector[idx%VectorDim] += tfidf
+			vector[idx%VectorDim] += tf * idf
 		}
 	}
 
-	// 归一化向量
 	normalizeVector(vector)
-
 	return vector, nil
 }
 
@@ -71,14 +60,10 @@ func (e *SimpleEmbedder) Embed(ctx context.Context, text string) ([]float64, err
 func (e *SimpleEmbedder) BuildVocabulary(texts []string) {
 	e.log.Info("构建词汇表，文档数: %d", len(texts))
 
-	// 统计每个关键词的文档频率
 	keywordDocCount := make(map[string]int)
-
 	for _, text := range texts {
-		keywords := e.extractKeywords(text)
 		seen := make(map[string]bool)
-
-		for _, keyword := range keywords {
+		for _, keyword := range extractKeywords(text) {
 			if !seen[keyword] {
 				keywordDocCount[keyword]++
 				seen[keyword] = true
@@ -86,10 +71,9 @@ func (e *SimpleEmbedder) BuildVocabulary(texts []string) {
 		}
 	}
 
-	// 构建词汇表
 	idx := 0
 	for keyword, count := range keywordDocCount {
-		if count >= 2 { // 只保留出现至少2次的关键词
+		if count >= 2 {
 			e.vocabulary[keyword] = idx
 			e.docFreq[keyword] = count
 			idx++
@@ -101,29 +85,23 @@ func (e *SimpleEmbedder) BuildVocabulary(texts []string) {
 }
 
 // extractKeywords 提取文本中的关键词
-func (e *SimpleEmbedder) extractKeywords(text string) []string {
-	// 转换为小写
+func extractKeywords(text string) []string {
 	text = strings.ToLower(text)
-
-	// 分词（简单的空格和标点分割）
 	var keywords []string
 	var current strings.Builder
 
 	for _, r := range text {
 		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' {
 			current.WriteRune(r)
-		} else {
-			if current.Len() > 0 {
-				word := current.String()
-				if len(word) >= 2 && !isStopWord(word) {
-					keywords = append(keywords, word)
-				}
-				current.Reset()
+		} else if current.Len() > 0 {
+			word := current.String()
+			if len(word) >= 2 && !isStopWord(word) {
+				keywords = append(keywords, word)
 			}
+			current.Reset()
 		}
 	}
 
-	// 处理最后一个词
 	if current.Len() > 0 {
 		word := current.String()
 		if len(word) >= 2 && !isStopWord(word) {
@@ -140,11 +118,9 @@ func normalizeVector(vector []float64) {
 	for _, v := range vector {
 		sum += v * v
 	}
-
 	if sum == 0 {
 		return
 	}
-
 	norm := math.Sqrt(sum)
 	for i := range vector {
 		vector[i] /= norm
