@@ -137,15 +137,6 @@ def process_payment(payment_type, identifier, amount):
 - [ ] 检查性能影响
 - [ ] 代码审查
 
-### 4. 自动化重构工具推荐
-
-| 语言       | 工具                  | 用途             |
-| ---------- | --------------------- | ---------------- |
-| Python     | rope, black, isort    | 自动重构、格式化 |
-| JavaScript | jscodeshift, prettier | 代码转换、格式化 |
-| Java       | IntelliJ重构功能      | 安全重构         |
-| TypeScript | ts-morph              | AST操作          |
-
 ## 重构决策树
 
 ```
@@ -246,12 +237,11 @@ def update_user(user_id, user_info: UserInfo):
     pass
 ```
 
-## 输出格式
+## 开始执行重构
 
-当执行重构结束后，请按以下格式输出：
+### 根据分析，使用可用工具，执行重构
 
-```markdown
-## 重构分析报告
+## 重构完成后生成,重构分析报告
 
 ### 发现的问题
 
@@ -280,6 +270,7 @@ def update_user(user_id, user_info: UserInfo):
 - 可读性提升: [描述]
 - 可维护性提升: [描述]
 - 性能影响: [正面/负面/中性]
+
 ```
 
 ## 注意事项
@@ -289,3 +280,4 @@ def update_user(user_id, user_info: UserInfo):
 3. **渐进式改进** - 小步快跑，持续集成
 4. **团队协作** - 重构前与团队沟通，避免冲突
 5. **文档同步** - 更新相关文档和注释
+```

@@ -95,6 +95,11 @@ func (c *client) HandleToolCalls(ctx context.Context, message []llms.MessageCont
 					Arguments: toolcall.FunctionCall.Arguments,
 				},
 			})
+			startToolMessage := c.messageFormatter.FormatToolCallMessage(
+				toolcall.FunctionCall.Name,
+				toolcall.FunctionCall.Arguments,
+			)
+			c.manager.TeleGramSendMessage(startToolMessage)
 			res, err := tools.GetTools()[toolcall.FunctionCall.Name].Call(ctx, toolcall.FunctionCall.Arguments)
 			if err != nil {
 				c.log.Error("调用工具:%s失败,参数:%.20s,错误:%.50s", toolcall.FunctionCall.Name, toolcall.FunctionCall.Arguments, err)
@@ -106,16 +111,7 @@ func (c *client) HandleToolCalls(ctx context.Context, message []llms.MessageCont
 					err.Error(),
 				)
 				c.manager.TeleGramSendMessage(errorMessage)
-			} else {
-				// 发送美化的工具调用成功消息到Telegram
-				successMessage := c.messageFormatter.FormatToolSuccessMessage(
-					toolcall.FunctionCall.Name,
-					toolcall.FunctionCall.Arguments,
-					res,
-				)
-				c.manager.TeleGramSendMessage(successMessage)
 			}
-
 			toolsMessage.Parts = append(toolsMessage.Parts, llms.ToolCallResponse{
 				ToolCallID: toolcall.ID,
 				Content:    res,
