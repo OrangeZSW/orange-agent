@@ -248,7 +248,7 @@ def update_user(user_id, user_info: UserInfo):
 
 ## 输出格式
 
-当执行重构时，请按以下格式输出：
+当执行重构结束后，请按以下格式输出：
 
 ```markdown
 ## 重构分析报告

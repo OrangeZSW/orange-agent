@@ -15,11 +15,11 @@ import (
 type Skill struct {
 	Name        string
 	Description string
-	Content     string
 }
 
 var (
 	skills    []Skill
+	skillPath = make(map[string]string)
 	once      sync.Once
 	SkillTool = common.BaseTool{
 		Name:        "skill",
@@ -42,13 +42,9 @@ func SkillCall(ctx context.Context, input string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	for _, skill := range initSkills() {
-		if skill.Name == params["name"].(string) {
-			res, _ := yaml.Marshal(skill)
-			return string(res), nil
-		}
-	}
-	return "", nil
+	name := params["name"].(string)
+	res, err := file.ReadFile(skillPath[name])
+	return string(res), err
 }
 
 func initSkills() []Skill {
@@ -72,6 +68,7 @@ func initSkills() []Skill {
 					continue
 				}
 				skills = append(skills, skill)
+				skillPath[skill.Name] = item.Path
 			}
 		}
 	})
