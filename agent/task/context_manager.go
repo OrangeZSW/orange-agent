@@ -1,6 +1,7 @@
 package task
 
 import (
+	"fmt"
 	"orange-agent/domain"
 	"sync"
 )
@@ -36,6 +37,12 @@ func (cm *ContextManager) GetTaskContext(subTaskID uint) (*domain.TaskContext, b
 	return cm.contextRegistry.Get(subTaskID)
 }
 
+// GetContext 实现ContextManagerInterface接口
+func (cm *ContextManager) GetContext(taskID uint) *domain.TaskContext {
+	ctx, _ := cm.GetTaskContext(taskID)
+	return ctx
+}
+
 // AddMessage 添加消息到指定上下文
 func (cm *ContextManager) AddMessage(subTaskID uint, role, content string, tokenCount int) {
 	if ctx, exists := cm.contextRegistry.Get(subTaskID); exists {
@@ -48,16 +55,36 @@ func (cm *ContextManager) AddMessage(subTaskID uint, role, content string, token
 }
 
 // CompressContext 压缩上下文（当token超过限制时）
-func (cm *ContextManager) CompressContext(subTaskID uint, summary string) {
-	if ctx, exists := cm.contextRegistry.Get(subTaskID); exists {
-		// 保留系统prompt和摘要
-		ctx.Messages = []domain.Message{
-			{Role: "system", Content: ctx.SystemPrompt},
-			{Role: "assistant", Content: "Previous conversation summary: " + summary},
-		}
-		// 重置token计数（这里简化处理，实际应该计算摘要的token数）
-		ctx.TokenCount = 0
+func (cm *ContextManager) CompressContext(subTaskID uint, maxTokens int) error {
+	ctx, exists := cm.contextRegistry.Get(subTaskID)
+	if !exists {
+		return fmt.Errorf("context for subTask %d not found", subTaskID)
 	}
+	if ctx.TokenCount <= maxTokens {
+		return nil
+	}
+	// 压缩逻辑：保留系统prompt和最近的消息直到token数低于限制
+	newMessages := []domain.Message{
+		{Role: "system", Content: ctx.SystemPrompt},
+	}
+	newTokenCount := len(ctx.SystemPrompt)
+	// 从后往前添加历史消息
+	for i := len(ctx.Messages) - 1; i >= 0; i-- {
+		msg := ctx.Messages[i]
+		msgTokens := len(msg.Content)
+		if newTokenCount + msgTokens > maxTokens {
+			break
+		}
+		newMessages = append(newMessages, msg)
+		newTokenCount += msgTokens
+	}
+	// 反转消息恢复正确顺序
+	for i, j := 1, len(newMessages)-1; i < j; i, j = i+1, j-1 {
+		newMessages[i], newMessages[j] = newMessages[j], newMessages[i]
+	}
+	ctx.Messages = newMessages
+	ctx.TokenCount = newTokenCount
+	return nil
 }
 
 // SessionStore 存储会话信息

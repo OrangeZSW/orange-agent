@@ -11,9 +11,9 @@ type TaskChat interface {
 	Chat(ctx context.Context, messages []domain.Message) string
 }
 
-// TaskExecutor 任务执行器接口
-type TaskExecutor interface {
-	Execute(ctx context.Context, task *domain.Task) (string, error)
+// TaskExecutorInterface 子任务执行器接口
+type TaskExecutorInterface interface {
+	ExecuteSubTask(ctx context.Context, subTask *domain.SubTask) error
 }
 
 // TaskSplitterInterface 任务拆分器接口
@@ -35,7 +35,7 @@ type DAGEngineInterface interface {
 // ResultAggregatorInterface 结果聚合器接口
 type ResultAggregatorInterface interface {
 	AddResult(subTask *domain.SubTask)
-	GetSummary() string
+	GetSummary() *AggregationSummary
 	GetProgress() float64
 	GetSuccessCount() int
 	GetFailedCount() int
@@ -47,4 +47,9 @@ type ContextManagerInterface interface {
 	AddMessage(taskID uint, role, content string, tokenCount int)
 	GetContext(taskID uint) *domain.TaskContext
 	CompressContext(taskID uint, maxTokens int) error
+}
+
+// TaskSummarizerInterface 任务总结器接口
+type TaskSummarizerInterface interface {
+	Summarize(ctx context.Context, task *domain.Task, summary *AggregationSummary) (string, error)
 }

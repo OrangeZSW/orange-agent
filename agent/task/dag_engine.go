@@ -31,7 +31,7 @@ func (de *DAGEngine) ExecuteDAG(ctx context.Context, task *domain.Task) (string,
 	logger.Info("开始执行DAG任务: %s", task.Description)
 
 	// 1. 构建DAG图
-	dag, err := de.buildDAG(task.Subtasks)
+	dag, err := de.BuildDAG(task.Subtasks)
 	if err != nil {
 		return "", fmt.Errorf("构建DAG失败: %w", err)
 	}
@@ -56,8 +56,8 @@ func (de *DAGEngine) ExecuteDAG(ctx context.Context, task *domain.Task) (string,
 	return result, nil
 }
 
-// buildDAG 构建有向无环图
-func (de *DAGEngine) buildDAG(subTasks []*domain.SubTask) (*domain.DependencyGraph, error) {
+// BuildDAG 构建有向无环图
+func (de *DAGEngine) BuildDAG(subTasks []*domain.SubTask) (*domain.DependencyGraph, error) {
 	dag := &domain.DependencyGraph{
 		Nodes:    make([]*domain.DAGNode, 0, len(subTasks)),
 		Edges:    make([]*domain.DAGEdge, 0),
