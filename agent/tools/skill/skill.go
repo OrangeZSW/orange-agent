@@ -21,7 +21,7 @@ type Skill struct {
 var (
 	skills    []Skill
 	once      sync.Once
-	SkillTool = &common.BaseTool{
+	SkillTool = common.BaseTool{
 		Name:        "skill",
 		Description: "获取技能详细信息",
 		Parameters: map[string]interface{}{

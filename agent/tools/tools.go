@@ -5,6 +5,7 @@ import (
 	"orange-agent/agent/tools/database"
 	"orange-agent/agent/tools/file"
 	"orange-agent/agent/tools/git"
+	"orange-agent/agent/tools/skill"
 	"orange-agent/agent/tools/system"
 	"orange-agent/common"
 	"sync"
@@ -24,6 +25,7 @@ func InitTools() {
 		Tools = append(Tools, system.SystemTools...)
 		Tools = append(Tools, agent.AgentTools...)
 		Tools = append(Tools, database.DatabaseTools...)
+		Tools = append(Tools, skill.SkillTool)
 	})
 }
 
