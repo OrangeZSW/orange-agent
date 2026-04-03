@@ -1,4 +1,4 @@
-# Orange Agent - 智能 Telegram 代理机器人
+<text_never_used_51bce0c785ca2f68081bfa7d91973934># Orange Agent - 智能 Telegram 代理机器人
 
 Orange Agent 是一个基于 Go 语言开发的 Telegram 智能代理机器人，集成了 LangChain 框架，支持多 AI 模型切换、工具调用和 Telegram 消息通知功能。
 
@@ -417,4 +417,4 @@ tail -f log/orange-agent.log
 
 ---
 
-如有问题或建议，请通过 Issue 或 Pull Request 提交。
+如有问题或建议，请通过 Issue 或 Pull Request 提交。</text_never_used_51bce0c785ca2f68081bfa7d91973934>
