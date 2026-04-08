@@ -10,9 +10,9 @@ import (
 
 const (
 	// MaxContextChars 最大上下文字符数（超过则触发压缩）
-	MaxContextChars = 30000
+	MaxContextChars = 100000
 	// CompressThreshold 触压压缩的阈值
-	CompressThreshold = 22000
+	CompressThreshold = 100000
 	// KeepRecentMessages 保留的最近消息数（不压缩）
 	KeepRecentMessages = 4
 )
