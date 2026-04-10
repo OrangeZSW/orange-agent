@@ -121,7 +121,7 @@ func (c *client) handleToolCalls(ctx context.Context, messages []llms.MessageCon
 				Arguments: toolCall.FunctionCall.Arguments,
 			},
 		})
-		c.manager.SendMessage(fmt.Sprintf("调用工具%s\n", toolCall.FunctionCall.Name))
+		c.manager.SendMessage(fmt.Sprintf("调用工具%s", toolCall.FunctionCall.Name))
 
 		// 执行工具
 		c.log.Info("调用工具:%s,参数:```%.20s```", toolCall.FunctionCall.Name, toolCall.FunctionCall.Arguments)
