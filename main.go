@@ -2,6 +2,7 @@ package main
 
 import (
 	"orange-agent/agent"
+	"orange-agent/agent/manager"
 	"orange-agent/agent/rag"
 	"orange-agent/config"
 	"orange-agent/repository/db"
@@ -28,5 +29,9 @@ func main() {
 	// 初始化并启动Telegram
 	tg := telegram.NewTelegram()
 	client := tg.Init(&cfg.Telegram, agent.NewAgent())
+
+	// 设置Telegram实例到Agent管理器
+	manager.SetTelegram(tg)
+
 	client.Start()
 }
