@@ -77,12 +77,6 @@ func (c *client) Chat(modelName string, messages []llms.MessageContent) string {
 
 // call 调用LLM
 func (c *client) call(ctx context.Context, messages []llms.MessageContent) (*llms.ContentResponse, error) {
-	// 上下文压缩
-	if c.compressor == nil {
-		c.compressor = agentutils.NewContextCompressor(c.llm)
-	}
-	messages = c.compressor.CompressIfNeeded(ctx, messages)
-
 	// 检查是否已有系统提示词，避免重复添加
 	hasSystemPrompt := false
 	for _, msg := range messages {
