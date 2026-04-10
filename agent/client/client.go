@@ -110,6 +110,8 @@ func (c *client) handleToolCalls(ctx context.Context, messages []llms.MessageCon
 		Parts: []llms.ContentPart{},
 	}
 
+	c.manager.SendMessage(resp.Choices[0].Content)
+
 	for _, toolCall := range resp.Choices[0].ToolCalls {
 		aiMessage.Parts = append(aiMessage.Parts, llms.ToolCall{
 			ID:   toolCall.ID,
@@ -119,13 +121,14 @@ func (c *client) handleToolCalls(ctx context.Context, messages []llms.MessageCon
 				Arguments: toolCall.FunctionCall.Arguments,
 			},
 		})
+		c.manager.SendMessage(fmt.Sprintf("调用工具%s/n", toolCall.FunctionCall.Name))
 
 		// 执行工具
 		c.log.Info("调用工具:%s,参数:```%.20s```", toolCall.FunctionCall.Name, toolCall.FunctionCall.Arguments)
 		result, err := tools.GetTools()[toolCall.FunctionCall.Name].Call(ctx, toolCall.FunctionCall.Arguments)
 		if err != nil {
 			c.log.Error("调用工具:%s失败,参数:%.20s,错误:%.50s", toolCall.FunctionCall.Name, toolCall.FunctionCall.Arguments, err)
-			result = "调用工具失败"
+			result = "调用工具失败" + err.Error()
 		}
 
 		toolMessages.Parts = append(toolMessages.Parts, llms.ToolCallResponse{
